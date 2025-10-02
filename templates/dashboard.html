@@ -1,0 +1,137 @@
+{% extends "layout.html" %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="space-y-12">
+    <div class="bg-white rounded-2xl shadow-xl p-8 transform transition-all duration-700 animate-fade-in-up">
+        <h2 class="text-4xl font-extrabold text-gray-900 mb-2">Welcome, {{ session.get('role') }}!</h2>
+        <p class="text-gray-600 text-lg">Your dashboard is your command center. Get a quick overview and take action.</p>
+        <div class="flex items-center mt-4">
+            <span class="font-semibold text-lg text-panos-green mr-2">Your role:</span>
+            <span class="text-lg font-bold text-blue-600">{{ session.get('role') }}</span>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+        {% if session.get('role') == 'Supervisor' %}
+            <a href="{{ url_for('new_request') }}" class="group block bg-white rounded-2xl shadow-lg p-6 transform transition-all duration-300 hover:scale-[1.05] hover:shadow-2xl animate-fade-in-delay-1">
+                <div class="flex flex-col items-center text-center">
+                    <svg class="h-12 w-12 text-panos-green mb-4 transition-transform duration-300 group-hover:rotate-[15deg] group-hover:scale-110" fill="currentColor" viewBox="0 0 20 20"><path d="M11 3a1 1 0 100 2h3a1 1 0 100-2h-3zM13 7a1 1 0 100 2h3a1 1 0 100-2h-3zM3 11a1 1 0 100 2h3a1 1 0 100-2h-3zM5 15a1 1 0 100 2h3a1 1 0 100-2h-3z" /></svg>
+                    <h3 class="text-xl font-bold text-panos-green mb-2 transition-colors duration-300 group-hover:text-panos-yellow">Submit New Request</h3>
+                    <p class="text-sm text-gray-500">Send a request for HR, Ops, or Finance</p>
+                </div>
+            </a>
+            <a href="{{ url_for('view_requests') }}" class="group block bg-white rounded-2xl shadow-lg p-6 transform transition-all duration-300 hover:scale-[1.05] hover:shadow-2xl animate-fade-in-delay-2">
+                <div class="flex flex-col items-center text-center">
+                    <svg class="h-12 w-12 text-panos-green mb-4 transition-transform duration-300 group-hover:rotate-[-15deg] group-hover:scale-110" fill="currentColor" viewBox="0 0 20 20"><path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9zM3 8a1 1 0 11-2 0 1 1 0 012 0zm14 0a1 1 0 11-2 0 1 1 0 012 0zm-8 10a1 1 0 000-2h2a1 1 0 100 2H9z" /></svg>
+                    <h3 class="text-xl font-bold text-panos-green mb-2 transition-colors duration-300 group-hover:text-panos-yellow">View My Requests</h3>
+                    <p class="text-sm text-gray-500">Track requests you have submitted</p>
+                </div>
+            </a>
+            <a href="{{ url_for('attendance') }}" class="group block bg-white rounded-2xl shadow-lg p-6 transform transition-all duration-300 hover:scale-[1.05] hover:shadow-2xl animate-fade-in-delay-3">
+                <div class="flex flex-col items-center text-center">
+                    <svg class="h-12 w-12 text-panos-green mb-4 transition-transform duration-300 group-hover:scale-110" fill="currentColor" viewBox="0 0 20 20"><path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 110-6 3 3 0 010 6z" /></svg>
+                    <h3 class="text-xl font-bold text-panos-green mb-2 transition-colors duration-300 group-hover:text-panos-yellow">Mark Guard Attendance</h3>
+                    <p class="text-sm text-gray-500">Record daily guard attendance</p>
+                </div>
+            </a>
+            <a href="{{ url_for('view_attendance') }}" class="group block bg-white rounded-2xl shadow-lg p-6 transform transition-all duration-300 hover:scale-[1.05] hover:shadow-2xl animate-fade-in-delay-4">
+                <div class="flex flex-col items-center text-center">
+                    <svg class="h-12 w-12 text-panos-green mb-4 transition-transform duration-300 group-hover:rotate-[15deg] group-hover:scale-110" fill="currentColor" viewBox="0 0 20 20"><path d="M4 4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2H4zm12 1a1 1 0 011 1v3a1 1 0 01-1 1H9a1 1 0 01-1-1V6a1 1 0 011-1h7z" /></svg>
+                    <h3 class="text-xl font-bold text-panos-green mb-2 transition-colors duration-300 group-hover:text-panos-yellow">View Attendance Records</h3>
+                    <p class="text-sm text-gray-500">Check submitted attendance logs</p>
+                </div>
+            </a>
+
+        {% elif session.get('role') == 'Business Support Officer' %}
+            <!-- BUSINESS SUPPORT OFFICER DASHBOARD -->
+            <a href="{{ url_for('view_requests') }}" class="group block bg-white rounded-2xl shadow-lg p-6 transform transition-all duration-300 hover:scale-[1.05] hover:shadow-2xl animate-fade-in-delay-1">
+                <div class="flex flex-col items-center text-center">
+                    <svg class="h-12 w-12 text-panos-green mb-4 transition-transform duration-300 group-hover:rotate-[-15deg] group-hover:scale-110" fill="currentColor" viewBox="0 0 20 20"><path d="M12 2a1 1 0 00-1 1v2a1 1 0 002 0V3a1 1 0 00-1-1zM5 4a1 1 0 00-1 1v1h2V5a1 1 0 00-1-1zM18 5a1 1 0 00-1-1h-2v1a1 1 0 001 1h1V5zM3 8a1 1 0 11-2 0 1 1 0 012 0zm16 0a1 1 0 11-2 0 1 1 0 012 0zm-8 10a1 1 0 000-2h2a1 1 0 100 2H9z" /></svg>
+                    <h3 class="text-xl font-bold text-panos-green mb-2 transition-colors duration-300 group-hover:text-panos-yellow">View All Requests</h3>
+                    <p class="text-sm text-gray-500">View all submitted supervisor requests</p>
+                </div>
+            </a>
+            <a href="{{ url_for('attendance') }}" class="group block bg-white rounded-2xl shadow-lg p-6 transform transition-all duration-300 hover:scale-[1.05] hover:shadow-2xl animate-fade-in-delay-2">
+                <div class="flex flex-col items-center text-center">
+                    <svg class="h-12 w-12 text-panos-green mb-4 transition-transform duration-300 group-hover:scale-110" fill="currentColor" viewBox="0 0 20 20"><path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 110-6 3 3 0 010 6z" /></svg>
+                    <h3 class="text-xl font-bold text-panos-green mb-2 transition-colors duration-300 group-hover:text-panos-yellow">Mark Guard Attendance</h3>
+                    <p class="text-sm text-gray-500">Record daily guard attendance</p>
+                </div>
+            </a>
+            <a href="{{ url_for('view_attendance') }}" class="group block bg-white rounded-2xl shadow-lg p-6 transform transition-all duration-300 hover:scale-[1.05] hover:shadow-2xl animate-fade-in-delay-3">
+                <div class="flex flex-col items-center text-center">
+                    <svg class="h-12 w-12 text-panos-green mb-4 transition-transform duration-300 group-hover:rotate-[15deg] group-hover:scale-110" fill="currentColor" viewBox="0 0 20 20"><path d="M4 4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2H4zm12 1a1 1 0 011 1v3a1 1 0 01-1 1H9a1 1 0 01-1-1V6a1 1 0 011-1h7z" /></svg>
+                    <h3 class="text-xl font-bold text-panos-green mb-2 transition-colors duration-300 group-hover:text-panos-yellow">View Attendance Records</h3>
+                    <p class="text-sm text-gray-500">Check submitted attendance logs</p>
+                </div>
+            </a>
+
+        {% elif session.get('role') == 'Ops Manager' %}
+            <a href="{{ url_for('view_requests') }}" class="group block bg-white rounded-2xl shadow-lg p-6 transform transition-all duration-300 hover:scale-[1.05] hover:shadow-2xl animate-fade-in-delay-1">
+                <div class="flex flex-col items-center text-center">
+                    <svg class="h-12 w-12 text-panos-green mb-4 transition-transform duration-300 group-hover:rotate-[-15deg] group-hover:scale-110" fill="currentColor" viewBox="0 0 20 20"><path d="M12 2a1 1 0 00-1 1v2a1 1 0 002 0V3a1 1 0 00-1-1zM5 4a1 1 0 00-1 1v1h2V5a1 1 0 00-1-1zM18 5a1 1 0 00-1-1h-2v1a1 1 0 001 1h1V5zM3 8a1 1 0 11-2 0 1 1 0 012 0zm16 0a1 1 0 11-2 0 1 1 0 012 0zm-8 10a1 1 0 000-2h2a1 1 0 100 2H9z" /></svg>
+                    <h3 class="text-xl font-bold text-panos-green mb-2 transition-colors duration-300 group-hover:text-panos-yellow">View All Requests</h3>
+                    <p class="text-sm text-gray-500">Manage and approve supervisor requests</p>
+                </div>
+            </a>
+            <a href="{{ url_for('view_attendance') }}" class="group block bg-white rounded-2xl shadow-lg p-6 transform transition-all duration-300 hover:scale-[1.05] hover:shadow-2xl animate-fade-in-delay-2">
+                <div class="flex flex-col items-center text-center">
+                    <svg class="h-12 w-12 text-panos-green mb-4 transition-transform duration-300 group-hover:scale-110" fill="currentColor" viewBox="0 0 20 20"><path d="M4 4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2H4zm12 1a1 1 0 011 1v3a1 1 0 01-1 1H9a1 1 0 01-1-1V6a1 1 0 011-1h7z" /></svg>
+                    <h3 class="text-xl font-bold text-panos-green mb-2 transition-colors duration-300 group-hover:text-panos-yellow">View Attendance Records</h3>
+                    <p class="text-sm text-gray-500">Monitor guard attendance logs</p>
+                </div>
+            </a>
+
+        {% elif session.get('role') == 'HR Officer' %}
+            <a href="{{ url_for('view_requests') }}" class="group block bg-white rounded-2xl shadow-lg p-6 transform transition-all duration-300 hover:scale-[1.05] hover:shadow-2xl animate-fade-in-delay-1">
+                <div class="flex flex-col items-center text-center">
+                    <svg class="h-12 w-12 text-panos-green mb-4 transition-transform duration-300 group-hover:rotate-[15deg] group-hover:scale-110" fill="currentColor" viewBox="0 0 20 20"><path d="M12 2a1 1 0 00-1 1v2a1 1 0 002 0V3a1 1 0 00-1-1zM5 4a1 1 0 00-1 1v1h2V5a1 1 0 00-1-1zM18 5a1 1 0 00-1-1h-2v1a1 1 0 001 1h1V5zM3 8a1 1 0 11-2 0 1 1 0 012 0zm16 0a1 1 0 11-2 0 1 1 0 012 0zm-8 10a1 1 0 000-2h2a1 1 0 100 2H9z" /></svg>
+                    <h3 class="text-xl font-bold text-panos-green mb-2 transition-colors duration-300 group-hover:text-panos-yellow">View HR-related Requests</h3>
+                    <p class="text-sm text-gray-500">Handle staff-related HR requests</p>
+                </div>
+            </a>
+            <a href="{{ url_for('view_attendance') }}" class="group block bg-white rounded-2xl shadow-lg p-6 transform transition-all duration-300 hover:scale-[1.05] hover:shadow-2xl animate-fade-in-delay-2">
+                <div class="flex flex-col items-center text-center">
+                    <svg class="h-12 w-12 text-panos-green mb-4 transition-transform duration-300 group-hover:rotate-[-15deg] group-hover:scale-110" fill="currentColor" viewBox="0 0 20 20"><path d="M4 4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2H4zm12 1a1 1 0 011 1v3a1 1 0 01-1 1H9a1 1 0 01-1-1V6a1 1 0 011-1h7z" /></svg>
+                    <h3 class="text-xl font-bold text-panos-green mb-2 transition-colors duration-300 group-hover:text-panos-yellow">View Attendance Records</h3>
+                    <p class="text-sm text-gray-500">Check attendance for HR purposes</p>
+                </div>
+            </a>
+
+        {% elif session.get('role') == 'Finance' %}
+            <a href="{{ url_for('view_requests') }}" class="group block bg-white rounded-2xl shadow-lg p-6 transform transition-all duration-300 hover:scale-[1.05] hover:shadow-2xl animate-fade-in-delay-1">
+                <div class="flex flex-col items-center text-center">
+                    <svg class="h-12 w-12 text-panos-green mb-4 transition-transform duration-300 group-hover:rotate-[15deg] group-hover:scale-110" fill="currentColor" viewBox="0 0 20 20"><path d="M12 2a1 1 0 00-1 1v2a1 1 0 002 0V3a1 1 0 00-1-1zM5 4a1 1 0 00-1 1v1h2V5a1 1 0 00-1-1zM18 5a1 1 0 00-1-1h-2v1a1 1 0 001 1h1V5zM3 8a1 1 0 11-2 0 1 1 0 012 0zm16 0a1 1 0 11-2 0 1 1 0 012 0zm-8 10a1 1 0 000-2h2a1 1 0 100 2H9z" /></svg>
+                    <h3 class="text-xl font-bold text-panos-green mb-2 transition-colors duration-300 group-hover:text-panos-yellow">View Finance Requests</h3>
+                    <p class="text-sm text-gray-500">Handle all finance-related approvals</p>
+                </div>
+            </a>
+            <a href="{{ url_for('view_attendance') }}" class="group block bg-white rounded-2xl shadow-lg p-6 transform transition-all duration-300 hover:scale-[1.05] hover:shadow-2xl animate-fade-in-delay-2">
+                <div class="flex flex-col items-center text-center">
+                    <svg class="h-12 w-12 text-panos-green mb-4 transition-transform duration-300 group-hover:rotate-[-15deg] group-hover:scale-110" fill="currentColor" viewBox="0 0 20 20"><path d="M4 4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2H4zm12 1a1 1 0 011 1v3a1 1 0 01-1 1H9a1 1 0 01-1-1V6a1 1 0 011-1h7z" /></svg>
+                    <h3 class="text-xl font-bold text-panos-green mb-2 transition-colors duration-300 group-hover:text-panos-yellow">View Attendance Records</h3>
+                    <p class="text-sm text-gray-500">Check attendance for payroll</p>
+                </div>
+            </a>
+
+        {% elif session.get('role') == 'General Manager' %}
+            <a href="{{ url_for('view_requests') }}" class="group block bg-white rounded-2xl shadow-lg p-6 transform transition-all duration-300 hover:scale-[1.05] hover:shadow-2xl animate-fade-in-delay-1">
+                <div class="flex flex-col items-center text-center">
+                    <svg class="h-12 w-12 text-panos-green mb-4 transition-transform duration-300 group-hover:rotate-[15deg] group-hover:scale-110" fill="currentColor" viewBox="0 0 20 20"><path d="M12 2a1 1 0 00-1 1v2a1 1 0 002 0V3a1 1 0 00-1-1zM5 4a1 1 0 00-1 1v1h2V5a1 1 0 00-1-1zM18 5a1 1 0 00-1-1h-2v1a1 1 0 001 1h1V5zM3 8a1 1 0 11-2 0 1 1 0 012 0zm16 0a1 1 0 11-2 0 1 1 0 012 0zm-8 10a1 1 0 000-2h2a1 1 0 100 2H9z" /></svg>
+                    <h3 class="text-xl font-bold text-panos-green mb-2 transition-colors duration-300 group-hover:text-panos-yellow">View All Requests</h3>
+                    <p class="text-sm text-gray-500">Oversee all operational requests</p>
+                </div>
+            </a>
+            <a href="{{ url_for('view_attendance') }}" class="group block bg-white rounded-2xl shadow-lg p-6 transform transition-all duration-300 hover:scale-[1.05] hover:shadow-2xl animate-fade-in-delay-2">
+                <div class="flex flex-col items-center text-center">
+                    <svg class="h-12 w-12 text-panos-green mb-4 transition-transform duration-300 group-hover:rotate-[-15deg] group-hover:scale-110" fill="currentColor" viewBox="0 0 20 20"><path d="M4 4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2H4zm12 1a1 1 0 011 1v3a1 1 0 01-1 1H9a1 1 0 01-1-1V6a1 1 0 011-1h7z" /></svg>
+                    <h3 class="text-xl font-bold text-panos-green mb-2 transition-colors duration-300 group-hover:text-panos-yellow">View Attendance Records</h3>
+                    <p class="text-sm text-gray-500">Monitor all attendance logs</p>
+                </div>
+            </a>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

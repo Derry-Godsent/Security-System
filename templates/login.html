@@ -1,0 +1,41 @@
+{% extends "layout.html" %}
+
+{% block title %}Login{% endblock %}
+
+{% block content %}
+<div class="flex items-center justify-center min-h-[calc(100vh-8rem)]">
+    <div class="w-full max-w-md bg-white p-8 rounded-2xl shadow-xl transform transition-all duration-500 hover:scale-[1.02] animate-fade-in">
+        
+        <div class="flex flex-col items-center justify-center mb-6 text-center">
+            <svg class="w-20 h-20 text-panos-yellow mb-2" fill="currentColor" viewBox="0 0 20 20">
+                <path d="M10 18a8 8 0 100-16 8 8 0 000 16zm-5.744-1.256A6 6 0 1114.744 1.256a7.975 7.975 0 00-4.744 16.744z"/>
+            </svg>
+            <h1 class="text-3xl font-bold text-panos-black tracking-wide">PANOS SECURITY</h1>
+            <p class="text-gray-500 text-sm mt-1">Guard & Attendance Management System</p>
+        </div>
+
+        <form method="post" class="space-y-5">
+            <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-1">Username</label>
+                <input type="text" name="username" required 
+                    class="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-panos-yellow focus:border-panos-yellow transition duration-300">
+            </div>
+            
+            <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-1">Password</label>
+                <input type="password" name="password" required 
+                    class="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-panos-green focus:border-panos-green transition duration-300">
+            </div>
+            
+            <button type="submit" 
+                class="w-full bg-panos-black text-panos-yellow py-2 px-4 rounded-lg font-semibold shadow-md transition-all duration-300 ease-in-out transform hover:scale-[1.03] hover:bg-gray-800 hover:text-panos-yellow">
+                Login
+            </button>
+        </form>
+
+        <p class="mt-6 text-xs text-gray-400 text-center">
+            © {{ current_year }} Panos Security Services Ltd.
+        </p>
+    </div>
+</div>
+{% endblock %}

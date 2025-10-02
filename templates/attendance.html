@@ -1,0 +1,1422 @@
+{% extends "layout.html" %}
+{% block content %}
+<div class="min-h-screen bg-gradient-to-br from-yellow-400 via-white to-green-600 py-10 px-6">
+    <div class="max-w-7xl mx-auto">
+        <div class="bg-white shadow-lg rounded-2xl p-6 mb-8 text-center">
+            <h2 class="text-3xl font-bold text-gray-800 mb-2">
+                <span class="text-yellow-500">📋</span> Guard Attendance System
+            </h2>
+            <p class="text-gray-600">Mark daily attendance for all locations</p>
+            <div class="mt-4 text-sm text-gray-500" id="currentDateTime"></div>
+        </div>
+
+        <div class="bg-white shadow-lg rounded-2xl p-6 mb-6">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="space-y-2">
+                    <label class="block text-sm font-medium text-gray-700">Search Locations</label>
+                    <div class="relative">
+                        <span class="absolute inset-y-0 left-0 pl-3 flex items-center">
+                            <span class="text-gray-400">🔍</span>
+                        </span>
+                        <input type="text" id="searchInput"
+                               class="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 transition"
+                               placeholder="Search locations...">
+                    </div>
+                </div>
+
+                <div class="space-y-2">
+                    <label class="block text-sm font-medium text-gray-700">Sort By</label>
+                    <select id="sortSelect"
+                            class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-green-500 focus:border-green-500 transition">
+                        <option value="company">Company</option>
+                        <option value="name">Location Name</option>
+                        <option value="progress">Progress</option>
+                    </select>
+                </div>
+
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Date</label>
+                        <input type="date" id="attendanceDate"
+                               class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+                </div>
+                
+                <div class="space-y-2 col-span-1 md:col-span-3 lg:col-span-1">
+                    <label class="block text-sm font-medium text-gray-700">Select Shift</label>
+                    <div class="flex rounded-lg shadow-sm overflow-hidden">
+                        <input type="radio" id="dayShift" name="shift" value="day" class="hidden" checked>
+                        <label for="dayShift" class="flex-1 px-4 py-2 text-center cursor-pointer transition">
+                            ☀️ Day
+                        </label>
+                        <input type="radio" id="nightShift" name="shift" value="night" class="hidden">
+                        <label for="nightShift" class="flex-1 px-4 py-2 text-center cursor-pointer transition">
+                            🌙 Night
+                        </label>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="companiesContainer" class="space-y-6">
+            <div class="bg-white shadow-lg rounded-2xl p-8 text-center" id="loadingState">
+                <div class="animate-spin w-8 h-8 border-4 border-yellow-400 border-t-transparent rounded-full mx-auto mb-4"></div>
+                <p class="text-gray-600">Loading locations...</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="guardModal" class="fixed inset-0 z-50 hidden overflow-y-auto">
+    <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+        <div class="fixed inset-0 transition-opacity bg-black bg-opacity-75" id="modalBackdrop"></div>
+        
+        <div class="inline-block w-full max-w-4xl my-8 text-left align-middle transition-all transform bg-white shadow-2xl rounded-2xl">
+            <div class="bg-gradient-to-r from-black via-gray-800 to-black text-white px-6 py-4 rounded-t-2xl">
+                <div class="flex items-center justify-between">
+                    <h3 class="text-xl font-bold text-yellow-400" id="modalLocationTitle">
+                        👥 Location Guards
+                    </h3>
+                    <button type="button" class="text-white hover:text-yellow-400 transition" id="closeModal">
+                        <span class="text-2xl">×</span>
+                    </button>
+                </div>
+                <p class="text-gray-300 text-sm mt-1" id="modalShiftDisplay">Day Shift</p>
+            </div>
+
+            <div class="bg-gray-50 px-6 py-4 border-b" id="modalStats" style="display: none;">
+                <div class="grid grid-cols-4 gap-4">
+                    <div class="text-center">
+                        <div class="text-2xl font-bold text-blue-600" id="modalTotalGuards">0</div>
+                        <div class="text-sm text-gray-600">Total</div>
+                    </div>
+                    <div class="text-center">
+                        <div class="text-2xl font-bold text-green-600" id="modalPresentGuards">0</div>
+                        <div class="text-sm text-gray-600">Present</div>
+                    </div>
+                    <div class="text-center">
+                        <div class="text-2xl font-bold text-red-600" id="modalAbsentGuards">0</div>
+                        <div class="text-sm text-gray-600">Absent</div>
+                    </div>
+                    <div class="text-center">
+                        <div class="text-2xl font-bold text-yellow-600" id="modalUnmarkedGuards">0</div>
+                        <div class="text-sm text-gray-600">Unmarked</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white px-6 py-3 border-b sticky top-0 z-10">
+                <div class="flex flex-wrap gap-2">
+                    <button type="button" onclick="bulkMark('present')"
+                            class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition font-medium">
+                        ✅ All Present
+                    </button>
+                    <button type="button" onclick="bulkMark('absent')"
+                            class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition font-medium">
+                        ❌ All Absent
+                    </button>
+                    <button type="button" onclick="bulkMark('off')"
+                            class="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg transition font-medium">
+                        📅 All Off
+                    </button>
+                </div>
+            </div>
+
+            <div class="px-6 py-4 max-h-96 overflow-y-auto" id="modalGuardsList">
+                <div class="text-center py-8">
+                    <div class="animate-spin w-8 h-8 border-4 border-yellow-400 border-t-transparent rounded-full mx-auto mb-4"></div>
+                    <p class="text-gray-600">Loading guards...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="toastContainer" class="fixed top-4 right-4 z-50 space-y-2"></div>
+
+<style>
+    /* Custom styles for PANOS theme */
+    .company-card {
+        background: linear-gradient(135deg, rgba(255,255,255,0.9) 0%, rgba(255,255,255,0.95) 100%);
+        backdrop-filter: blur(10px);
+        transition: all 0.3s ease;
+    }
+    
+    .company-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+    }
+    
+    .company-header {
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+        cursor: pointer;
+        transition: all 0.3s ease;
+        position: relative;
+    }
+    
+    .company-header:hover {
+        background: linear-gradient(135deg, #e9ecef 0%, #dee2e6 100%);
+    }
+    
+    .company-header.expanded {
+        background: linear-gradient(135deg, #000000 0%, #374151 100%);
+        color: #fbbf24;
+    }
+    
+    .company-header.disabled {
+        background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+        color: #92400e;
+        opacity: 0.7;
+        cursor: not-allowed;
+    }
+    
+    .location-card {
+        background: white;
+        border: 2px solid #e5e7eb;
+        transition: all 0.3s ease;
+        cursor: pointer;
+    }
+    
+    .location-card:hover:not(.disabled) {
+        border-color: #fbbf24;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(251, 191, 36, 0.15);
+    }
+    
+    .location-card.disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+        border-color: #ef4444;
+        background-color: #fef2f2;
+    }
+    
+    .guard-card {
+        transition: all 0.3s ease;
+        border-left: 4px solid #e5e7eb;
+    }
+    
+    .guard-card:hover {
+        transform: translateX(2px);
+    }
+    
+    .guard-card.present { 
+        border-left-color: #10b981; 
+        background: linear-gradient(to right, #f0fdf4, #ffffff);
+    }
+    
+    .guard-card.absent { 
+        border-left-color: #ef4444; 
+        background: linear-gradient(to right, #fef2f2, #ffffff);
+    }
+    
+    .guard-card.off { 
+        border-left-color: #f59e0b; 
+        background: linear-gradient(to right, #fffbeb, #ffffff);
+    }
+    
+    .guard-card.leave { 
+        border-left-color: #3b82f6; 
+        background: linear-gradient(to right, #eff6ff, #ffffff);
+    }
+    
+    .progress-bar {
+        height: 6px;
+        background-color: #e5e7eb;
+        border-radius: 3px;
+        overflow: hidden;
+        margin: 8px 0;
+    }
+    
+    .progress-fill {
+        height: 100%;
+        background: linear-gradient(90deg, #10b981, #059669);
+        transition: width 0.3s ease;
+    }
+    
+    .status-btn {
+        transition: all 0.2s ease;
+    }
+    
+    .status-btn:hover {
+        transform: translateY(-1px);
+    }
+    
+    /* Custom shift toggle styling */
+    input[name="shift"]:checked + label {
+        background: linear-gradient(135deg, #fbbf24, #f59e0b) !important;
+        color: white !important;
+    }
+    
+    input[name="shift"]:not(:checked) + label {
+        background: #f3f4f6 !important;
+        color: #6b7280 !important;
+    }
+    
+    input[name="shift"]:not(:checked) + label:hover {
+        background: #e5e7eb !important;
+    }
+    
+    /* Animation classes */
+    .fade-in {
+        animation: fadeIn 0.3s ease-out;
+    }
+    
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    
+    .expand-icon {
+        transition: transform 0.3s ease;
+    }
+    
+    .expanded .expand-icon {
+        transform: rotate(180deg);
+    }
+</style>
+
+<script>
+    let currentShift = 'day';
+    let allLocations = [];
+    let currentLocationId = null;
+
+    document.addEventListener('DOMContentLoaded', function() {
+        // Set current date
+        const today = new Date().toISOString().split('T')[0];
+        document.getElementById('attendanceDate').value = today;
+        
+        // Update current time
+        updateDateTime();
+        setInterval(updateDateTime, 60000);
+        
+        // Load locations
+        loadCompaniesAndLocations();
+
+        // Event listeners
+        setupEventListeners();
+        updateShiftDisplay();
+        updateShiftToggle();
+    });
+
+    function setupEventListeners() {
+        // Shift change handlers
+        document.querySelectorAll('input[name="shift"]').forEach(radio => {
+            radio.addEventListener('change', function() {
+                currentShift = this.value;
+                updateShiftToggle();
+                updateShiftDisplay();
+                updateAllProgress();
+            });
+        });
+
+        // Search and sort
+        document.getElementById('searchInput').addEventListener('input', filterAndSortLocations);
+        document.getElementById('sortSelect').addEventListener('change', filterAndSortLocations);
+        document.getElementById('attendanceDate').addEventListener('change', updateAllProgress);
+
+        // Modal controls
+        document.getElementById('closeModal').addEventListener('click', closeModal);
+        document.getElementById('modalBackdrop').addEventListener('click', closeModal);
+    }
+
+    function updateShiftToggle() {
+        const dayLabel = document.querySelector('label[for="dayShift"]');
+        const nightLabel = document.querySelector('label[for="nightShift"]');
+        
+        if (currentShift === 'day') {
+            dayLabel.className = 'flex-1 px-4 py-2 text-center cursor-pointer transition bg-yellow-500 text-white font-semibold';
+            nightLabel.className = 'flex-1 px-4 py-2 text-center cursor-pointer transition bg-gray-200 text-gray-700 hover:bg-gray-300';
+        } else {
+            dayLabel.className = 'flex-1 px-4 py-2 text-center cursor-pointer transition bg-gray-200 text-gray-700 hover:bg-gray-300';
+            nightLabel.className = 'flex-1 px-4 py-2 text-center cursor-pointer transition bg-blue-600 text-white font-semibold';
+        }
+    }
+
+    function updateDateTime() {
+        const now = new Date();
+        const options = {
+            weekday: 'long',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        };
+        document.getElementById('currentDateTime').textContent = now.toLocaleDateString('en-US', options);
+    }
+
+    function updateShiftDisplay() {
+        const shift = currentShift.charAt(0).toUpperCase() + currentShift.slice(1);
+        document.getElementById('modalShiftDisplay').textContent = `${shift} Shift`;
+    }
+
+    async function loadCompaniesAndLocations() {
+        try {
+            const response = await fetch('/api/all-locations');
+            allLocations = await response.json();
+            
+            renderCompaniesAndLocations();
+            updateAllProgress();
+        } catch (error) {
+            console.error('Error loading locations:', error);
+            showToast('Error loading locations', 'error');
+        }
+    }
+
+    function renderCompaniesAndLocations() {
+        const container = document.getElementById('companiesContainer');
+        const loadingState = document.getElementById('loadingState');
+        
+        if (loadingState) {
+            loadingState.remove();
+        }
+        
+        container.innerHTML = '';
+
+        // Group locations by company
+        const companies = {};
+        allLocations.forEach(location => {
+            if (!companies[location.company]) {
+                companies[location.company] = [];
+            }
+            companies[location.company].push(location);
+        });
+
+        // Create company sections
+        Object.keys(companies).forEach(companyName => {
+            const companySection = createCompanySection(companyName, companies[companyName]);
+            container.appendChild(companySection);
+        });
+
+        filterAndSortLocations();
+    }
+
+    function createCompanySection(companyName, locations) {
+        const section = document.createElement('div');
+        section.className = 'company-card shadow-lg rounded-2xl overflow-hidden fade-in';
+        section.dataset.company = companyName;
+
+        const isDisabled = locations.some(loc => loc.is_accessible === false) && locations.every(loc => loc.is_accessible === false);
+        const accessibleCount = locations.filter(loc => loc.is_accessible !== false).length;
+        const totalCount = locations.length;
+
+        section.innerHTML = `
+            <div class="company-header p-6 ${isDisabled ? 'disabled' : ''}" onclick="toggleCompany('${companyName}')">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h3 class="text-xl font-bold mb-1">🏢 ${companyName}</h3>
+                        <p class="text-sm opacity-80">
+                            ${accessibleCount}/${totalCount} locations accessible
+                            ${isDisabled ? ' • Limited Access' : ''}
+                        </p>
+                        <div class="text-xs mt-1 opacity-70" id="company-progress-${companyName}">
+                            Loading progress...
+                        </div>
+                    </div>
+                    <div class="expand-icon text-2xl">⌄</div>
+                </div>
+            </div>
+            <div class="locations-content hidden" id="locations-${companyName}">
+                <div class="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                    ${locations.map(location => createLocationCard(location)).join('')}
+                </div>
+            </div>
+        `;
+
+        return section;
+    }
+
+    function createLocationCard(location) {
+        const isDisabled = location.is_accessible === false;
+        
+        return `
+            <div class="location-card p-4 rounded-lg ${isDisabled ? 'disabled' : ''}"
+                 data-location-id="${location.id}"
+                 data-location-name="${location.name}"
+                 data-company="${location.company}"
+                 ${!isDisabled ? `onclick="openLocationModal(${location.id}, '${location.company}', '${location.name}')"` : ''}>
+                
+                ${isDisabled ? '<div class="absolute top-2 right-2 bg-red-500 text-white text-xs px-2 py-1 rounded-full">🚫 No Access</div>' : ''}
+                
+                <div class="font-semibold text-gray-800 mb-3">${location.name}</div>
+                
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progress-fill-${location.id}" style="width: 0%"></div>
+                </div>
+                
+                <div class="text-sm text-gray-600 text-center" id="progress-text-${location.id}">
+                    ${isDisabled ? 'Access Restricted' : 'Loading...'}
+                </div>
+            </div>
+        `;
+    }
+
+    function toggleCompany(companyName) {
+        const header = document.querySelector(`[data-company="${companyName}"] .company-header`);
+        const content = document.getElementById(`locations-${companyName}`);
+        
+        if (header.classList.contains('disabled')) return;
+        
+        const isExpanded = header.classList.contains('expanded');
+        
+        if (isExpanded) {
+            header.classList.remove('expanded');
+            content.classList.add('hidden');
+        } else {
+            header.classList.add('expanded');
+            content.classList.remove('hidden');
+        }
+    }
+
+    async function openLocationModal(locationId, company, locationName) {
+        currentLocationId = locationId;
+        
+        // Update modal title
+        document.getElementById('modalLocationTitle').textContent = `👥 ${company} - ${locationName}`;
+        
+        // Show modal
+        document.getElementById('guardModal').classList.remove('hidden');
+        document.body.style.overflow = 'hidden';
+        
+        // Load guards
+        await loadGuardsForModal(locationId);
+    }
+
+    function closeModal() {
+        document.getElementById('guardModal').classList.add('hidden');
+        document.body.style.overflow = 'auto';
+        currentLocationId = null;
+        updateAllProgress();
+    }
+
+    async function loadGuardsForModal(locationId) {
+        try {
+            const guardsList = document.getElementById('modalGuardsList');
+            guardsList.innerHTML = `
+                <div class="text-center py-8">
+                    <div class="animate-spin w-8 h-8 border-4 border-yellow-400 border-t-transparent rounded-full mx-auto mb-4"></div>
+                    <p class="text-gray-600">Loading guards...</p>
+                </div>
+            `;
+
+            // CORRECTED line to pass shift as a query parameter
+            const response = await fetch(`/api/guards/${locationId}/${currentShift}`);
+            const guards = await response.json();
+            
+            guardsList.innerHTML = '';
+
+            if (guards.length === 0) {
+                guardsList.innerHTML = `
+                    <div class="text-center py-8">
+                        <div class="text-6xl mb-4">👥</div>
+                        <p class="text-gray-600">No guards assigned for ${currentShift} shift</p>
+                    </div>
+                `;
+            } else {
+                guards.forEach(guard => {
+                    const guardCard = createGuardCard(guard);
+                    guardsList.appendChild(guardCard);
+
+                    // ⭐ ADD THIS LINE TO LOAD COMMENTS ⭐
+                loadGuardCommentsPreview(guard.id);
+            });
+        
+            }
+
+            updateModalStats(guards);
+            document.getElementById('modalStats').style.display = 'block';
+
+        } catch (error) {
+            console.error('Error loading guards:', error);
+            document.getElementById('modalGuardsList').innerHTML = `
+                <div class="text-center py-8 text-red-600">
+                    <div class="text-4xl mb-4">⚠️</div>
+                    <p>Error loading guards</p>
+                </div>
+            `;
+        }
+    }
+
+    function createGuardCard(guard) {
+    const card = document.createElement('div');
+    card.className = `guard-card bg-white rounded-lg p-4 mb-4 shadow-sm border-l-4 ${guard.status || ''}`;
+    
+    const roleIcon = guard.role === 'supervisor' ? '👨‍💼' : guard.role === 'driver' ? '🚗' : '👮‍♂️';
+    
+    // Determine shift display info
+    const shiftInfo = getShiftDisplayInfo(guard);
+    
+    card.innerHTML = `
+        <div class="flex items-center justify-between">
+            <div class="flex-1">
+                <div class="font-semibold text-gray-800 mb-1">
+                    ${roleIcon} ${guard.name}
+                    ${guard.is_temporary ? '<span class="ml-2 px-2 py-1 text-xs bg-purple-100 text-purple-700 rounded-full">🔄 Temporary</span>' : ''}
+                </div>
+                <div class="text-xs text-gray-500 uppercase tracking-wide mb-2">
+                    ${guard.role}
+                </div>
+                
+                <!-- Shift Information -->
+                <div class="text-xs space-y-1">
+                    ${shiftInfo.html}
+                </div>
+            </div>
+            
+            <!-- Status Buttons -->
+            <div class="flex flex-wrap gap-2 ml-4">
+                <button type="button"
+                        class="px-3 py-1 text-sm rounded-lg transition status-btn ${guard.status === 'present' ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-green-100'}"
+                        onclick="markAttendance(${guard.id}, 'present', this)">
+                    ✅ Present
+                </button>
+                <button type="button"
+                        class="px-3 py-1 text-sm rounded-lg transition status-btn ${guard.status === 'absent' ? 'bg-red-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-red-100'}"
+                        onclick="markAttendance(${guard.id}, 'absent', this)">
+                    ❌ Absent
+                </button>
+                <button type="button"
+                        class="px-3 py-1 text-sm rounded-lg transition status-btn ${guard.status === 'off' ? 'bg-yellow-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-yellow-100'}"
+                        onclick="markAttendance(${guard.id}, 'off', this)">
+                    📅 Off
+                </button>
+                <button type="button"
+                        class="px-3 py-1 text-sm rounded-lg transition status-btn ${guard.status === 'leave' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-blue-100'}"
+                        onclick="markAttendance(${guard.id}, 'leave', this)">
+                    🏥 Leave
+                </button>
+            </div>
+            
+            <!-- 3-Dot Menu -->
+            <div class="relative ml-2">
+                <button type="button" 
+                        class="guard-menu-btn w-8 h-8 flex items-center justify-center text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition"
+                        onclick="toggleGuardMenu(${guard.id})"
+                        title="Guard Actions">
+                    ⋮
+                </button>
+                <div id="guardMenu-${guard.id}" class="guard-menu hidden absolute right-0 top-10 bg-white border border-gray-200 rounded-lg shadow-lg py-1 z-10 w-56">
+                    <button type="button" onclick="openCommentModal(${guard.id}, '${guard.name}', 'note')" 
+                            class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition">
+                        📝 Add Note
+                    </button>
+                    <button type="button" onclick="openCommentModal(${guard.id}, '${guard.name}', 'relocation')" 
+                            class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition">
+                        🔄 Mark as Relocated
+                    </button>
+                    <button type="button" onclick="openCommentModal(${guard.id}, '${guard.name}', 'issue')" 
+                            class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition">
+                        ⚠️ Report Issue
+                    </button>
+                    <div class="border-t border-gray-100 my-1"></div>
+                    <button type="button" onclick="openShiftChangeModal(${guard.id}, '${guard.name}')" 
+                            class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition">
+                        🔀 Change Shift/Location
+                    </button>
+                    ${guard.has_override ? `
+                    <button type="button" onclick="removeShiftOverride(${guard.id}, '${guard.name}')" 
+                            class="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition">
+                        ❌ Remove Override
+                    </button>` : ''}
+                    <div class="border-t border-gray-100 my-1"></div>
+                    <button type="button" onclick="viewGuardComments(${guard.id}, '${guard.name}')" 
+                            class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition">
+                        👁️ View History
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        ${guard.notes ? `<div class="mt-3 text-sm text-gray-600 bg-gray-50 rounded p-2">📝 ${guard.notes}</div>` : ''}
+        
+        <!-- Comments Preview (if any recent comments) -->
+        <div id="guardComments-${guard.id}" class="mt-2"></div>
+    `;
+    
+    return card;
+}
+
+// Helper function to generate shift display information
+function getShiftDisplayInfo(guard) {
+    const shiftEmojis = {
+        'day': '☀️',
+        'night': '🌙'
+    };
+    
+    let html = '';
+    
+    if (!guard.has_override) {
+        // Normal assignment
+        html = `
+            <div class="flex items-center text-gray-600">
+                <span class="mr-1">${shiftEmojis[guard.default_shift]}</span>
+                <span>Regular ${guard.default_shift} shift</span>
+            </div>
+        `;
+    } else {
+        // Has override
+        const isShiftChanged = guard.is_shift_changed;
+        const isLocationChanged = guard.is_location_changed;
+        
+        if (isShiftChanged && isLocationChanged) {
+            // Both shift and location changed
+            html = `
+                <div class="flex items-center text-amber-600">
+                    <span class="mr-1">${shiftEmojis[guard.default_shift]}</span>
+                    <span class="line-through">${guard.default_shift}</span>
+                    <span class="mx-1">→</span>
+                    <span class="mr-1">${shiftEmojis[guard.current_shift]}</span>
+                    <span class="font-medium">${guard.current_shift}</span>
+                </div>
+                <div class="flex items-center text-purple-600">
+                    <span class="mr-1">📍</span>
+                    <span class="text-xs">Moved from ${guard.original_location || 'regular location'}</span>
+                </div>
+                <div class="text-xs text-gray-500 italic">
+                    Reason: ${guard.override_reason || 'No reason provided'}
+                </div>
+            `;
+        } else if (isShiftChanged) {
+            // Only shift changed
+            html = `
+                <div class="flex items-center text-amber-600">
+                    <span class="mr-1">${shiftEmojis[guard.default_shift]}</span>
+                    <span class="line-through">${guard.default_shift}</span>
+                    <span class="mx-1">→</span>
+                    <span class="mr-1">${shiftEmojis[guard.current_shift]}</span>
+                    <span class="font-medium">${guard.current_shift} shift</span>
+                </div>
+                <div class="text-xs text-gray-500 italic">
+                    Reason: ${guard.override_reason || 'No reason provided'}
+                </div>
+            `;
+        } else if (isLocationChanged) {
+            // Only location changed
+            html = `
+                <div class="flex items-center text-gray-600">
+                    <span class="mr-1">${shiftEmojis[guard.current_shift]}</span>
+                    <span>${guard.current_shift} shift</span>
+                </div>
+                <div class="flex items-center text-purple-600">
+                    <span class="mr-1">📍</span>
+                    <span class="text-xs">Moved from ${guard.original_location || 'regular location'}</span>
+                </div>
+                <div class="text-xs text-gray-500 italic">
+                    Reason: ${guard.override_reason || 'No reason provided'}
+                </div>
+            `;
+        }
+        
+        // Add override indicator
+        html += `
+            <div class="mt-1 flex items-center text-xs">
+                <span class="px-2 py-1 bg-orange-100 text-orange-700 rounded-full">
+                    🔄 Override Active
+                </span>
+            </div>
+        `;
+    }
+    
+    return { html };
+}
+
+    async function bulkMark(status) {
+        if (!currentLocationId || !confirm(`Mark all guards as ${status}?`)) return;
+        
+        try {
+            const response = await fetch('/api/bulk-mark', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    location_id: currentLocationId,
+                    shift: currentShift,
+                    status: status
+                })
+            });
+
+            if (response.ok) {
+                await loadGuardsForModal(currentLocationId);
+                showToast(`All guards marked as ${status}`, 'success');
+            } else {
+                throw new Error('Failed to bulk update');
+            }
+        } catch (error) {
+            console.error('Error bulk marking:', error);
+            showToast('Error updating attendance', 'error');
+        }
+    }
+
+    async function markAttendance(guardId, status, button) {
+        // Find the parent guard card element
+        const guardCard = button.closest('.guard-card');
+        
+        // Disable all buttons to prevent double-clicking
+        const allButtons = guardCard.querySelectorAll('.status-btn');
+        allButtons.forEach(btn => btn.disabled = true);
+
+        try {
+            const attendanceDate = document.getElementById('attendanceDate').value;
+
+            // Make the POST request to the Flask backend
+            const response = await fetch('/api/mark-attendance', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    guard_id: guardId,
+                    status: status,
+                    shift: currentShift,
+                    date: attendanceDate
+                })
+            });
+
+            if (response.ok) {
+                const result = await response.json();
+                
+                // Update the guard card's appearance
+                guardCard.className = `guard-card bg-white rounded-lg p-4 mb-4 shadow-sm border-l-4 ${status}`;
+                
+                // Update button styles
+                allButtons.forEach(btn => {
+                    const btnStatus = btn.textContent.trim().split(' ')[1].toLowerCase();
+                    if (btnStatus === status) {
+                        btn.classList.add(`bg-${status}-600`, 'text-white');
+                        btn.classList.remove('bg-gray-200', 'text-gray-700', 'hover:bg-green-100', 'hover:bg-red-100', 'hover:bg-yellow-100', 'hover:bg-blue-100');
+                    } else {
+                        btn.classList.add('bg-gray-200', 'text-gray-700');
+                        btn.classList.remove(`bg-${status}-600`, 'text-white');
+                    }
+                });
+
+                showToast(result.message, 'success');
+
+                // Reload guards to update stats
+                await loadGuardsForModal(currentLocationId);
+
+            } else {
+                const errorData = await response.json();
+                throw new Error(errorData.message || 'Failed to update attendance.');
+            }
+        } catch (error) {
+            console.error('Error marking attendance:', error);
+            showToast('Error: ' + error.message, 'error');
+        } finally {
+            // Re-enable all buttons
+            const allButtons = guardCard.querySelectorAll('.status-btn');
+            allButtons.forEach(btn => btn.disabled = false);
+        }
+    }
+
+    async function updateAllProgress() {
+        const accessibleLocations = allLocations.filter(loc => loc.is_accessible !== false);
+        
+        for (const location of accessibleLocations) {
+            await updateLocationProgress(location.id);
+        }
+        
+        updateCompanyProgress();
+    }
+
+    async function updateLocationProgress(locationId) {
+        try {
+            const response = await fetch(`/api/guards/${locationId}?shift=${currentShift}`);
+            const guards = await response.json();
+            
+            const marked = guards.filter(g => g.status).length;
+            const total = guards.length;
+            const percentage = total > 0 ? (marked / total) * 100 : 0;
+
+            const progressFill = document.getElementById(`progress-fill-${locationId}`);
+            const progressText = document.getElementById(`progress-text-${locationId}`);
+            
+            if (progressFill && progressText) {
+                progressFill.style.width = `${percentage}%`;
+                progressText.textContent = `${marked}/${total} marked`;
+                
+                // Update progress bar color
+                if (percentage === 100) {
+                    progressFill.style.background = 'linear-gradient(90deg, #10b981, #059669)';
+                } else if (percentage > 0) {
+                    progressFill.style.background = 'linear-gradient(90deg, #f59e0b, #d97706)';
+                } else {
+                    progressFill.style.background = 'linear-gradient(90deg, #ef4444, #dc2626)';
+                }
+            }
+        } catch (error) {
+            console.error(`Error updating progress for location ${locationId}:`, error);
+        }
+    }
+
+    function updateCompanyProgress() {
+        const companies = {};
+        allLocations.forEach(location => {
+            if (!companies[location.company]) {
+                companies[location.company] = { total: 0, marked: 0 };
+            }
+            
+            const progressText = document.getElementById(`progress-text-${location.id}`);
+            if (progressText && location.is_accessible !== false) {
+                const match = progressText.textContent.match(/(\d+)\/(\d+)/);
+                if (match) {
+                    companies[location.company].marked += parseInt(match[1]);
+                    companies[location.company].total += parseInt(match[2]);
+                }
+            }
+        });
+
+        Object.keys(companies).forEach(companyName => {
+            const progressElement = document.getElementById(`company-progress-${companyName}`);
+            if (progressElement) {
+                const { marked, total } = companies[companyName];
+                const percentage = total > 0 ? Math.round((marked / total) * 100) : 0;
+                progressElement.textContent = `${marked}/${total} guards marked (${percentage}%)`;
+            }
+        });
+    }
+
+    function updateModalStats(guards) {
+        const total = guards.length;
+        const present = guards.filter(g => g.status === 'present').length;
+        const absent = guards.filter(g => g.status === 'absent').length;
+        const off = guards.filter(g => g.status === 'off').length;
+        const leave = guards.filter(g => g.status === 'leave').length;
+        const unmarked = total - present - absent - off - leave;
+
+        document.getElementById('modalTotalGuards').textContent = total;
+        document.getElementById('modalPresentGuards').textContent = present;
+        document.getElementById('modalAbsentGuards').textContent = absent;
+        document.getElementById('modalUnmarkedGuards').textContent = unmarked;
+    }
+
+    function filterAndSortLocations() {
+        const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+        const sortBy = document.getElementById('sortSelect').value;
+        
+        // Implementation for search and sort functionality
+        const companySections = document.querySelectorAll('.company-card');
+        companySections.forEach(section => {
+            const locations = section.querySelectorAll('.location-card');
+            let visibleCount = 0;
+            
+            locations.forEach(location => {
+                const name = location.dataset.locationName.toLowerCase();
+                const company = location.dataset.company.toLowerCase();
+                const isVisible = name.includes(searchTerm) || company.includes(searchTerm);
+                
+                location.style.display = isVisible ? 'block' : 'none';
+                if (isVisible) visibleCount++;
+            });
+            
+            section.style.display = visibleCount > 0 ? 'block' : 'none';
+        });
+    }
+
+    function showToast(message, type) {
+        const toast = document.createElement('div');
+        toast.className = `px-4 py-3 rounded-lg shadow-lg text-white font-medium fade-in ${
+            type === 'success' ? 'bg-green-600' :
+            type === 'error' ? 'bg-red-600' :
+            'bg-yellow-600'
+        }`;
+        
+        const icon = type === 'success' ? '✅' : type === 'error' ? '❌' : '⚠️';
+        toast.innerHTML = `${icon} ${message}`;
+        
+        const container = document.getElementById('toastContainer');
+        container.appendChild(toast);
+        
+        setTimeout(() => {
+            toast.style.opacity = '0';
+            toast.style.transform = 'translateX(100%)';
+            setTimeout(() => container.removeChild(toast), 300);
+        }, 3000);
+    }
+
+    // Initialize progress updates when page loads
+    setTimeout(updateAllProgress, 1000);
+
+    // Guard menu functions
+let activeMenuId = null;
+
+function toggleGuardMenu(guardId) {
+    const menu = document.getElementById(`guardMenu-${guardId}`);
+    
+    // Close any other open menu
+    if (activeMenuId && activeMenuId !== guardId) {
+        const activeMenu = document.getElementById(`guardMenu-${activeMenuId}`);
+        if (activeMenu) activeMenu.classList.add('hidden');
+    }
+    
+    // Toggle current menu
+    if (menu.classList.contains('hidden')) {
+        menu.classList.remove('hidden');
+        activeMenuId = guardId;
+    } else {
+        menu.classList.add('hidden');
+        activeMenuId = null;
+    }
+}
+
+// Close menu when clicking outside
+document.addEventListener('click', function(event) {
+    if (!event.target.closest('.guard-menu-btn') && !event.target.closest('.guard-menu')) {
+        if (activeMenuId) {
+            const activeMenu = document.getElementById(`guardMenu-${activeMenuId}`);
+            if (activeMenu) {
+                activeMenu.classList.add('hidden');
+                activeMenuId = null;
+            }
+        }
+    }
+});
+
+function openCommentModal(guardId, guardName, commentType) {
+    // Close the guard menu
+    if (activeMenuId) {
+        const activeMenu = document.getElementById(`guardMenu-${activeMenuId}`);
+        if (activeMenu) activeMenu.classList.add('hidden');
+        activeMenuId = null;
+    }
+    
+    // Create and show comment modal
+    const modal = document.createElement('div');
+    modal.id = 'commentModal';
+    modal.className = 'fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50';
+    
+    const typeLabels = {
+        'note': 'Add Note',
+        'relocation': 'Mark as Relocated', 
+        'issue': 'Report Issue'
+    };
+    
+    const typePlaceholders = {
+        'note': 'Enter your note about this guard...',
+        'relocation': 'Specify new location or reason for relocation...',
+        'issue': 'Describe the issue or concern...'
+    };
+    
+    modal.innerHTML = `
+        <div class="bg-white rounded-2xl p-6 w-full max-w-md mx-4">
+            <div class="mb-4">
+                <h3 class="text-xl font-bold text-gray-800">${typeLabels[commentType]}</h3>
+                <p class="text-gray-600">Guard: <span class="font-medium">${guardName}</span></p>
+            </div>
+            
+            <div class="mb-4">
+                <textarea id="commentText" 
+                          class="w-full px-3 py-2 border border-gray-300 rounded-lg resize-none focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400" 
+                          rows="4" 
+                          placeholder="${typePlaceholders[commentType]}"
+                          required></textarea>
+            </div>
+            
+            <div class="flex gap-3">
+                <button onclick="saveGuardComment(${guardId}, '${commentType}')" 
+                        class="flex-1 bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded-lg font-medium transition">
+                    💾 Save
+                </button>
+                <button onclick="closeCommentModal()" 
+                        class="flex-1 bg-gray-500 hover:bg-gray-600 text-white py-2 px-4 rounded-lg font-medium transition">
+                    ❌ Cancel
+                </button>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    document.getElementById('commentText').focus();
+}
+
+function closeCommentModal() {
+    const modal = document.getElementById('commentModal');
+    if (modal) {
+        document.body.removeChild(modal);
+    }
+}
+
+async function saveGuardComment(guardId, commentType) {
+    const commentText = document.getElementById('commentText').value.trim();
+    
+    if (!commentText) {
+        alert('Please enter a comment');
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/add-guard-comment', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                guard_id: guardId,
+                comment: commentText,
+                type: commentType
+            })
+        });
+        
+        if (response.ok) {
+            closeCommentModal();
+            showToast('Comment saved successfully!', 'success');
+            
+            // Refresh guard comments preview
+            loadGuardCommentsPreview(guardId);
+        } else {
+            throw new Error('Failed to save comment');
+        }
+    } catch (error) {
+        console.error('Error saving comment:', error);
+        showToast('Error saving comment', 'error');
+    }
+}
+
+function viewGuardComments(guardId, guardName) {
+    // Close the guard menu
+    if (activeMenuId) {
+        const activeMenu = document.getElementById(`guardMenu-${activeMenuId}`);
+        if (activeMenu) activeMenu.classList.add('hidden');
+        activeMenuId = null;
+    }
+    
+    // Create and show comments history modal
+    const modal = document.createElement('div');
+    modal.id = 'commentsHistoryModal';
+    modal.className = 'fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50';
+    
+    modal.innerHTML = `
+        <div class="bg-white rounded-2xl p-6 w-full max-w-2xl mx-4 max-h-96 overflow-hidden flex flex-col">
+            <div class="mb-4">
+                <h3 class="text-xl font-bold text-gray-800">Guard History</h3>
+                <p class="text-gray-600">Comments for: <span class="font-medium">${guardName}</span></p>
+            </div>
+            
+            <div id="commentsHistoryContent" class="flex-1 overflow-y-auto">
+                <div class="text-center py-4">
+                    <div class="animate-spin w-6 h-6 border-2 border-yellow-400 border-t-transparent rounded-full mx-auto mb-2"></div>
+                    <p class="text-gray-600">Loading comments...</p>
+                </div>
+            </div>
+            
+            <div class="mt-4">
+                <button onclick="closeCommentsHistoryModal()" 
+                        class="w-full bg-gray-500 hover:bg-gray-600 text-white py-2 px-4 rounded-lg font-medium transition">
+                    Close
+                </button>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    loadGuardCommentsHistory(guardId);
+}
+
+function closeCommentsHistoryModal() {
+    const modal = document.getElementById('commentsHistoryModal');
+    if (modal) {
+        document.body.removeChild(modal);
+    }
+}
+
+async function loadGuardCommentsHistory(guardId) {
+    try {
+        const response = await fetch(`/api/guard-comments/${guardId}`);
+        const comments = await response.json();
+        
+        const content = document.getElementById('commentsHistoryContent');
+        
+        if (comments.length === 0) {
+            content.innerHTML = `
+                <div class="text-center py-8">
+                    <div class="text-4xl mb-2">📝</div>
+                    <p class="text-gray-600">No comments yet for this guard</p>
+                </div>
+            `;
+            return;
+        }
+        
+        const commentsHTML = comments.map(comment => {
+            const typeIcons = {
+                'note': '📝',
+                'relocation': '🔄',
+                'issue': '⚠️'
+            };
+            
+            const typeColors = {
+                'note': 'bg-blue-50 border-blue-200',
+                'relocation': 'bg-yellow-50 border-yellow-200',
+                'issue': 'bg-red-50 border-red-200'
+            };
+            
+            return `
+                <div class="mb-3 p-3 border rounded-lg ${typeColors[comment.type]}">
+                    <div class="flex justify-between items-start mb-1">
+                        <span class="text-sm font-medium">${typeIcons[comment.type]} ${comment.type.charAt(0).toUpperCase() + comment.type.slice(1)}</span>
+                        <span class="text-xs text-gray-500">${comment.created_at}</span>
+                    </div>
+                    <p class="text-sm text-gray-700 mb-1">${comment.comment}</p>
+                    <p class="text-xs text-gray-500">By: ${comment.created_by}</p>
+                </div>
+            `;
+        }).join('');
+        
+        content.innerHTML = commentsHTML;
+        
+    } catch (error) {
+        console.error('Error loading comments:', error);
+        document.getElementById('commentsHistoryContent').innerHTML = `
+            <div class="text-center py-4 text-red-600">
+                <p>Error loading comments</p>
+            </div>
+        `;
+    }
+}
+
+async function loadGuardCommentsPreview(guardId) {
+    try {
+        const response = await fetch(`/api/guard-comments/${guardId}`);
+        const comments = await response.json();
+        
+        const previewContainer = document.getElementById(`guardComments-${guardId}`);
+        
+        if (comments.length > 0) {
+            const latestComment = comments[0]; // Most recent
+            const typeIcons = {
+                'note': '📝',
+                'relocation': '🔄', 
+                'issue': '⚠️'
+            };
+            
+            previewContainer.innerHTML = `
+                <div class="text-xs text-gray-600 bg-blue-50 rounded p-2 border-l-2 border-blue-300">
+                    <div class="font-medium">${typeIcons[latestComment.type]} Latest: ${latestComment.type}</div>
+                    <div class="truncate">${latestComment.comment}</div>
+                    <div class="text-gray-500 mt-1">${latestComment.created_at} by ${latestComment.created_by}</div>
+                </div>
+            `;
+        } else {
+            previewContainer.innerHTML = '';
+        }
+    } catch (error) {
+        console.error('Error loading comment preview:', error);
+    }
+}
+
+// Shift management functions
+function openShiftChangeModal(guardId, guardName) {
+    // Close the guard menu
+    if (activeMenuId) {
+        const activeMenu = document.getElementById(`guardMenu-${activeMenuId}`);
+        if (activeMenu) activeMenu.classList.add('hidden');
+        activeMenuId = null;
+    }
+    
+    // Create shift change modal
+    const modal = document.createElement('div');
+    modal.id = 'shiftChangeModal';
+    modal.className = 'fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50';
+    
+    modal.innerHTML = `
+        <div class="bg-white rounded-2xl p-6 w-full max-w-md mx-4">
+            <div class="mb-4">
+                <h3 class="text-xl font-bold text-gray-800">🔀 Change Shift/Location</h3>
+                <p class="text-gray-600">Guard: <span class="font-medium">${guardName}</span></p>
+            </div>
+            
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">New Shift</label>
+                    <select id="newShift" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400">
+                        <option value="day">☀️ Day Shift</option>
+                        <option value="night">🌙 Night Shift</option>
+                    </select>
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">New Location (Optional)</label>
+                    <select id="newLocation" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400">
+                        <option value="">Keep current location</option>
+                    </select>
+                    <div class="mt-1 text-xs text-gray-500">Loading locations...</div>
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Reason for Change</label>
+                    <textarea id="changeReason" 
+                              class="w-full px-3 py-2 border border-gray-300 rounded-lg resize-none focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400" 
+                              rows="3" 
+                              placeholder="e.g., Covering for sick guard, Emergency reassignment..."
+                              required></textarea>
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Date</label>
+                    <input type="date" id="changeDate" 
+                           class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400"
+                           value="${new Date().toISOString().split('T')[0]}">
+                </div>
+            </div>
+            
+            <div class="flex gap-3 mt-6">
+                <button onclick="saveShiftChange(${guardId})" 
+                        class="flex-1 bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded-lg font-medium transition">
+                    💾 Save Changes
+                </button>
+                <button onclick="closeShiftChangeModal()" 
+                        class="flex-1 bg-gray-500 hover:bg-gray-600 text-white py-2 px-4 rounded-lg font-medium transition">
+                    ❌ Cancel
+                </button>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    loadLocationOptions();
+    document.getElementById('changeReason').focus();
+}
+
+function closeShiftChangeModal() {
+    const modal = document.getElementById('shiftChangeModal');
+    if (modal) {
+        document.body.removeChild(modal);
+    }
+}
+
+async function loadLocationOptions() {
+    try {
+        const newShiftSelect = document.getElementById('newShift');
+        const newLocationSelect = document.getElementById('newLocation');
+        const helpText = document.querySelector('#shiftChangeModal .text-xs.text-gray-500');
+        
+        newShiftSelect.addEventListener('change', async function() {
+            const selectedShift = this.value;
+            helpText.textContent = 'Loading locations for ' + selectedShift + ' shift...';
+            
+            try {
+                const response = await fetch(`/api/locations-for-shift/${selectedShift}`);
+                const locations = await response.json();
+                
+                // Clear and populate location options
+                newLocationSelect.innerHTML = '<option value="">Keep current location</option>';
+                
+                let currentCompany = '';
+                locations.forEach(location => {
+                    if (location.company !== currentCompany) {
+                        if (currentCompany !== '') {
+                            // Add separator for new company
+                            const separator = document.createElement('option');
+                            separator.disabled = true;
+                            separator.textContent = '─────────────────';
+                            newLocationSelect.appendChild(separator);
+                        }
+                        currentCompany = location.company;
+                        
+                        // Add company header
+                        const header = document.createElement('option');
+                        header.disabled = true;
+                        header.textContent = `🏢 ${location.company}`;
+                        header.style.fontWeight = 'bold';
+                        newLocationSelect.appendChild(header);
+                    }
+                    
+                    const option = document.createElement('option');
+                    option.value = location.id;
+                    option.textContent = `📍 ${location.name}`;
+                    newLocationSelect.appendChild(option);
+                });
+                
+                helpText.textContent = `${locations.length} locations available for ${selectedShift} shift`;
+                
+            } catch (error) {
+                console.error('Error loading locations:', error);
+                helpText.textContent = 'Error loading locations';
+            }
+        });
+        
+        // Trigger initial load
+        newShiftSelect.dispatchEvent(new Event('change'));
+        
+    } catch (error) {
+        console.error('Error setting up location options:', error);
+    }
+}
+
+async function saveShiftChange(guardId) {
+    const newShift = document.getElementById('newShift').value;
+    const newLocationId = document.getElementById('newLocation').value;
+    const reason = document.getElementById('changeReason').value.trim();
+    const changeDate = document.getElementById('changeDate').value;
+    
+    if (!reason) {
+        alert('Please provide a reason for the change');
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/create-shift-override', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                guard_id: guardId,
+                override_shift: newShift,
+                override_location_id: newLocationId || null,
+                reason: reason,
+                date: changeDate
+            })
+        });
+        
+        if (response.ok) {
+            closeShiftChangeModal();
+            showToast('Shift change saved successfully!', 'success');
+            
+            // Refresh the current location's guards
+            if (currentLocationId) {
+                await loadGuardsForModal(currentLocationId);
+            }
+            
+            // Update progress for all locations
+            updateAllProgress();
+        } else {
+            throw new Error('Failed to save shift change');
+        }
+    } catch (error) {
+        console.error('Error saving shift change:', error);
+        showToast('Error saving shift change', 'error');
+    }
+}
+
+async function removeShiftOverride(guardId, guardName) {
+    if (!confirm(`Remove shift override for ${guardName}? This will restore their regular schedule.`)) {
+        return;
+    }
+    
+    // Close the guard menu
+    if (activeMenuId) {
+        const activeMenu = document.getElementById(`guardMenu-${activeMenuId}`);
+        if (activeMenu) activeMenu.classList.add('hidden');
+        activeMenuId = null;
+    }
+    
+    try {
+        const response = await fetch(`/api/remove-shift-override/${guardId}`, {
+            method: 'DELETE'
+        });
+        
+        if (response.ok) {
+            showToast('Shift override removed', 'success');
+            
+            // Refresh the current location's guards
+            if (currentLocationId) {
+                await loadGuardsForModal(currentLocationId);
+            }
+            
+            // Update progress for all locations
+            updateAllProgress();
+        } else {
+            throw new Error('Failed to remove shift override');
+        }
+    } catch (error) {
+        console.error('Error removing shift override:', error);
+        showToast('Error removing shift override', 'error');
+    }
+}
+</script>
+{% endblock %}

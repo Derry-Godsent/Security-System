@@ -1,0 +1,44 @@
+{
+    "users": [
+        {
+            "username": "supervisor",
+            "password": "1234",
+            "role": "Supervisor"
+        },
+        {
+            "username": "ops",
+            "password": "1234",
+            "role": "Ops Manager"
+        },
+        {
+            "username": "hr",
+            "password": "1234",
+            "role": "HR Officer"
+        },
+        {
+            "username": "finance",
+            "password": "1234",
+            "role": "Finance"
+        },
+        {
+            "username": "training",
+            "password": "1234",
+            "role": "Training Officer"
+        },
+        {
+            "username": "bso",
+            "password": "1234",
+            "role": "Business Support Officer"
+        },
+        {
+            "username": "gm",
+            "password": "1234",
+            "role": "General Manager"
+        }
+    ],
+    "requests": [
+    
+    ],
+    
+    "attendance": []
+}

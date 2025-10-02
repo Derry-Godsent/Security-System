@@ -1,0 +1,389 @@
+{% extends "layout.html" %}
+{% block content %}
+<div class="min-h-screen bg-gradient-to-br from-yellow-400 via-white to-green-600 py-10 px-6">
+    <div class="max-w-7xl mx-auto">
+        <!-- Header -->
+        <div class="bg-white shadow-lg rounded-2xl p-6 mb-8 text-center">
+            <h2 class="text-3xl font-bold text-gray-800 mb-2">
+                <span class="text-green-500">📊</span> Attendance Records
+            </h2>
+            <p class="text-gray-600">View and monitor guard attendance history</p>
+        </div>
+
+        <!-- Filters Section -->
+        <div class="bg-white shadow-lg rounded-2xl p-6 mb-6">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Filter by Date</label>
+                    <input type="date" id="filterDate" class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Filter by Shift</label>
+                    <select id="filterShift" class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-green-500 focus:border-green-500">
+                        <option value="">All Shifts</option>
+                        <option value="day">Day Shift</option>
+                        <option value="night">Night Shift</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Filter by Status</label>
+                    <select id="filterStatus" class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500">
+                        <option value="">All Statuses</option>
+                        <option value="present">Present</option>
+                        <option value="absent">Absent</option>
+                        <option value="off">Off</option>
+                        <option value="leave">Leave</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Search Guard</label>
+                    <input type="text" id="searchGuard" placeholder="Search guard name..." class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
+                </div>
+            </div>
+            <div class="mt-4 flex gap-2">
+                <button onclick="applyFilters()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition font-medium">
+                    🔍 Apply Filters
+                </button>
+                <button onclick="clearFilters()" class="px-4 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded-lg transition font-medium">
+                    🗑️ Clear Filters
+                </button>
+                <button onclick="exportData()" class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition font-medium">
+                    📊 Export Data
+                </button>
+            </div>
+        </div>
+
+        <!-- Statistics Summary -->
+        <div class="bg-white shadow-lg rounded-2xl p-6 mb-6" id="statsSection">
+            <h3 class="text-xl font-bold text-gray-800 mb-4">📈 Attendance Statistics</h3>
+            <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
+                <div class="text-center p-4 bg-blue-50 rounded-lg">
+                    <div class="text-2xl font-bold text-blue-600" id="totalRecords">{{ attendance_records|length }}</div>
+                    <div class="text-sm text-gray-600">Total Records</div>
+                </div>
+                <div class="text-center p-4 bg-green-50 rounded-lg">
+                    <div class="text-2xl font-bold text-green-600" id="presentCount">0</div>
+                    <div class="text-sm text-gray-600">Present</div>
+                </div>
+                <div class="text-center p-4 bg-red-50 rounded-lg">
+                    <div class="text-2xl font-bold text-red-600" id="absentCount">0</div>
+                    <div class="text-sm text-gray-600">Absent</div>
+                </div>
+                <div class="text-center p-4 bg-yellow-50 rounded-lg">
+                    <div class="text-2xl font-bold text-yellow-600" id="offCount">0</div>
+                    <div class="text-sm text-gray-600">Off Duty</div>
+                </div>
+                <div class="text-center p-4 bg-purple-50 rounded-lg">
+                    <div class="text-2xl font-bold text-purple-600" id="leaveCount">0</div>
+                    <div class="text-sm text-gray-600">On Leave</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Attendance Table -->
+        <div class="bg-white shadow-lg rounded-2xl overflow-hidden">
+            <div class="p-6">
+                <h3 class="text-xl font-bold text-gray-800 mb-4">📋 Attendance Records</h3>
+            </div>
+            
+            <div class="overflow-x-auto">
+                <table class="w-full" id="attendanceTable">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">Date</th>
+                            <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">Guard Name</th>
+                            <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">Location</th>
+                            <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">Company</th>
+                            <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">Shift</th>
+                            <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">Status</th>
+                            <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">Marked By</th>
+                            <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">Time</th>
+                            <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">Notes</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-200" id="attendanceTableBody">
+                        {% for attendance, guard, location, company in attendance_records %}
+                        <tr class="hover:bg-gray-50 transition attendance-row" 
+                            data-date="{{ attendance.date.strftime('%Y-%m-%d') }}"
+                            data-shift="{{ attendance.shift }}"
+                            data-status="{{ attendance.status }}"
+                            data-guard="{{ guard.name.lower() }}">
+                            <td class="px-6 py-4 text-sm text-gray-900">
+                                <div class="font-medium">{{ attendance.date.strftime('%Y-%m-%d') }}</div>
+                                <div class="text-xs text-gray-500">{{ attendance.date.strftime('%A') }}</div>
+                            </td>
+                            <td class="px-6 py-4 text-sm text-gray-900">
+                                <div class="font-medium">
+                                    {% if guard.role == 'supervisor' %}👨‍💼
+                                    {% elif guard.role == 'driver' %}🚗
+                                    {% else %}👮‍♂️
+                                    {% endif %} 
+                                    {{ guard.name }}
+                                </div>
+                                <div class="text-xs text-gray-500 uppercase">{{ guard.role }}</div>
+                            </td>
+                            <td class="px-6 py-4 text-sm text-gray-900">{{ location.name }}</td>
+                            <td class="px-6 py-4 text-sm text-gray-900">
+                                <span class="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-800 rounded-full">
+                                    {{ company.name }}
+                                </span>
+                            </td>
+                            <td class="px-6 py-4 text-sm text-gray-900">
+                                <span class="px-2 py-1 text-xs font-medium rounded-full
+                                    {% if attendance.shift == 'day' %}bg-yellow-100 text-yellow-800
+                                    {% else %}bg-blue-100 text-blue-800{% endif %}">
+                                    {% if attendance.shift == 'day' %}☀️ Day
+                                    {% else %}🌙 Night{% endif %}
+                                </span>
+                            </td>
+                            <td class="px-6 py-4 text-sm">
+                                {% if attendance.status == 'present' %}
+                                    <span class="px-2 py-1 text-xs font-semibold text-green-800 bg-green-100 rounded-full">
+                                        ✅ Present
+                                    </span>
+                                {% elif attendance.status == 'absent' %}
+                                    <span class="px-2 py-1 text-xs font-semibold text-red-800 bg-red-100 rounded-full">
+                                        ❌ Absent
+                                    </span>
+                                {% elif attendance.status == 'off' %}
+                                    <span class="px-2 py-1 text-xs font-semibold text-yellow-800 bg-yellow-100 rounded-full">
+                                        📅 Off
+                                    </span>
+                                {% elif attendance.status == 'leave' %}
+                                    <span class="px-2 py-1 text-xs font-semibold text-blue-800 bg-blue-100 rounded-full">
+                                        🏥 Leave
+                                    </span>
+                                {% endif %}
+                            </td>
+                            <td class="px-6 py-4 text-sm text-gray-900">
+                                <div class="font-medium">{{ attendance.marked_by or '—' }}</div>
+                            </td>
+                            <td class="px-6 py-4 text-sm text-gray-500">
+                                <div>{{ attendance.timestamp.strftime('%H:%M:%S') }}</div>
+                                <div class="text-xs">{{ attendance.timestamp.strftime('%d/%m/%Y') }}</div>
+                            </td>
+                            <td class="px-6 py-4 text-sm text-gray-500">
+                                {% if attendance.notes %}
+                                    <div class="max-w-xs truncate" title="{{ attendance.notes }}">
+                                        📝 {{ attendance.notes }}
+                                    </div>
+                                {% else %}
+                                    —
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                
+                {% if not attendance_records %}
+                <div class="text-center py-12">
+                    <div class="text-6xl mb-4">📊</div>
+                    <h3 class="text-xl font-medium text-gray-900 mb-2">No attendance records found</h3>
+                    <p class="text-gray-500">Start marking attendance to see records here.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .attendance-row.hidden {
+        display: none;
+    }
+    
+    .fade-in {
+        animation: fadeIn 0.3s ease-in;
+    }
+    
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    
+    .table-container {
+        max-height: 600px;
+        overflow-y: auto;
+    }
+    
+    .sticky-header th {
+        position: sticky;
+        top: 0;
+        background: #f9fafb;
+        z-index: 10;
+    }
+</style>
+
+<script>
+    let allRows = [];
+    
+    document.addEventListener('DOMContentLoaded', function() {
+        // Store all table rows for filtering
+        allRows = Array.from(document.querySelectorAll('.attendance-row'));
+        
+        // Calculate initial statistics
+        updateStatistics();
+        
+        // Setup real-time search
+        document.getElementById('searchGuard').addEventListener('input', applyFilters);
+    });
+    
+    function applyFilters() {
+        const filterDate = document.getElementById('filterDate').value;
+        const filterShift = document.getElementById('filterShift').value;
+        const filterStatus = document.getElementById('filterStatus').value;
+        const searchGuard = document.getElementById('searchGuard').value.toLowerCase();
+        
+        let visibleCount = 0;
+        
+        allRows.forEach(row => {
+            let shouldShow = true;
+            
+            // Date filter
+            if (filterDate && row.dataset.date !== filterDate) {
+                shouldShow = false;
+            }
+            
+            // Shift filter
+            if (filterShift && row.dataset.shift !== filterShift) {
+                shouldShow = false;
+            }
+            
+            // Status filter
+            if (filterStatus && row.dataset.status !== filterStatus) {
+                shouldShow = false;
+            }
+            
+            // Guard name search
+            if (searchGuard && !row.dataset.guard.includes(searchGuard)) {
+                shouldShow = false;
+            }
+            
+            if (shouldShow) {
+                row.classList.remove('hidden');
+                visibleCount++;
+            } else {
+                row.classList.add('hidden');
+            }
+        });
+        
+        // Update statistics for visible rows
+        updateStatistics();
+        
+        // Show message if no results
+        const noResultsMessage = document.getElementById('noResultsMessage');
+        if (visibleCount === 0 && !noResultsMessage) {
+            const tbody = document.getElementById('attendanceTableBody');
+            const messageRow = document.createElement('tr');
+            messageRow.id = 'noResultsMessage';
+            messageRow.innerHTML = `
+                <td colspan="9" class="px-6 py-12 text-center">
+                    <div class="text-4xl mb-2">🔍</div>
+                    <p class="text-gray-500">No records match your filters</p>
+                </td>
+            `;
+            tbody.appendChild(messageRow);
+        } else if (visibleCount > 0 && noResultsMessage) {
+            noResultsMessage.remove();
+        }
+    }
+    
+    function clearFilters() {
+        document.getElementById('filterDate').value = '';
+        document.getElementById('filterShift').value = '';
+        document.getElementById('filterStatus').value = '';
+        document.getElementById('searchGuard').value = '';
+        
+        allRows.forEach(row => row.classList.remove('hidden'));
+        updateStatistics();
+        
+        const noResultsMessage = document.getElementById('noResultsMessage');
+        if (noResultsMessage) {
+            noResultsMessage.remove();
+        }
+    }
+    
+    function updateStatistics() {
+        const visibleRows = allRows.filter(row => !row.classList.contains('hidden'));
+        
+        const stats = {
+            total: visibleRows.length,
+            present: visibleRows.filter(row => row.dataset.status === 'present').length,
+            absent: visibleRows.filter(row => row.dataset.status === 'absent').length,
+            off: visibleRows.filter(row => row.dataset.status === 'off').length,
+            leave: visibleRows.filter(row => row.dataset.status === 'leave').length
+        };
+        
+        document.getElementById('totalRecords').textContent = stats.total;
+        document.getElementById('presentCount').textContent = stats.present;
+        document.getElementById('absentCount').textContent = stats.absent;
+        document.getElementById('offCount').textContent = stats.off;
+        document.getElementById('leaveCount').textContent = stats.leave;
+    }
+    
+    function exportData() {
+        const visibleRows = allRows.filter(row => !row.classList.contains('hidden'));
+        
+        if (visibleRows.length === 0) {
+            alert('No data to export');
+            return;
+        }
+        
+        // Prepare CSV data
+        const headers = ['Date', 'Guard Name', 'Location', 'Company', 'Shift', 'Status', 'Marked By', 'Time', 'Notes'];
+        let csvContent = headers.join(',') + '\\n';
+        
+        visibleRows.forEach(row => {
+            const cells = Array.from(row.querySelectorAll('td')).map(cell => {
+                // Clean up cell content for CSV
+                let text = cell.textContent.trim();
+                // Remove extra whitespace and newlines
+                text = text.replace(/\\s+/g, ' ');
+                // Escape quotes
+                text = text.replace(/"/g, '""');
+                // Wrap in quotes if contains comma
+                if (text.includes(',')) {
+                    text = `"${text}"`;
+                }
+                return text;
+            });
+            csvContent += cells.join(',') + '\\n';
+        });
+        
+        // Create download link
+        const blob = new Blob([csvContent], { type: 'text/csv' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `attendance_records_${new Date().toISOString().split('T')[0]}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+        
+        // Show success message
+        showToast('Data exported successfully!', 'success');
+    }
+    
+    function showToast(message, type) {
+        const toast = document.createElement('div');
+        toast.className = `fixed top-4 right-4 px-4 py-3 rounded-lg shadow-lg text-white font-medium fade-in z-50 ${
+            type === 'success' ? 'bg-green-600' : 
+            type === 'error' ? 'bg-red-600' : 
+            'bg-yellow-600'
+        }`;
+        
+        const icon = type === 'success' ? '✅' : type === 'error' ? '❌' : '⚠️';
+        toast.innerHTML = `${icon} ${message}`;
+        
+        document.body.appendChild(toast);
+        
+        setTimeout(() => {
+            toast.style.opacity = '0';
+            toast.style.transform = 'translateX(100%)';
+            setTimeout(() => document.body.removeChild(toast), 300);
+        }, 3000);
+    }
+</script>
+{% endblock %}
