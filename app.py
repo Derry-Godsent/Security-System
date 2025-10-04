@@ -853,39 +853,29 @@ def attendance():
 def view_attendance():
     if 'username' not in session:
         return redirect(url_for('login'))
-
-    # Subquery for latest comment per guard per date
-    subquery = db.session.query(
-        GuardComment.guard_id,
-        func.date(GuardComment.created_at).label('comment_date'),
-        GuardComment.comment
-    ).filter(GuardComment.is_active == True) \
-     .order_by(GuardComment.created_at.desc()) \
-     .distinct(GuardComment.guard_id, func.date(GuardComment.created_at)) \
-     .subquery()
-
-    # Main query
+    
+    # Simplified query - get all attendance records with guard/location/company info
     attendance_records = db.session.query(
-        Attendance, Guard, Location, Company, subquery.c.comment
-    ).join(Guard, Attendance.guard_id == Guard.id) \
-     .join(Location, Guard.location_id == Location.id) \
-     .join(Company, Location.company_id == Company.id) \
-     .outerjoin(
-         subquery,
-         (Attendance.guard_id == subquery.c.guard_id) &
-         (Attendance.date == subquery.c.comment_date)
-     ) \
-     .order_by(Attendance.date.desc(), Attendance.timestamp.desc()) \
-     .all()
+        Attendance, Guard, Location, Company
+    ).join(
+        Guard, Attendance.guard_id == Guard.id
+    ).join(
+        Location, Guard.location_id == Location.id
+    ).join(
+        Company, Location.company_id == Company.id
+    ).order_by(Attendance.date.desc(), Attendance.timestamp.desc()).all()
+    
+    # Get the most recent comment for each guard (simpler approach)
+    for attendance, guard, location, company in attendance_records:
+        latest_comment = GuardComment.query.filter_by(
+            guard_id=guard.id,
+            is_active=True
+        ).order_by(GuardComment.created_at.desc()).first()
+        
+        if latest_comment:
+            attendance.notes = latest_comment.comment
 
-    # Attach comment to Attendance object (safe for template)
-    processed_records = []
-    for attendance, guard, location, company, comment_text in attendance_records:
-        attendance.notes = comment_text or ""  # fallback if no comment
-        processed_records.append((attendance, guard, location, company))
-
-    return render_template('view_attendance.html', attendance_records=processed_records)
-# ============================================================================
+    return render_template('view_attendance.html', attendance_records=attendance_records)# ============================================================================
 # API ROUTES FOR ATTENDANCE
 # ============================================================================
 
