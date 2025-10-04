@@ -1,37 +1,26 @@
-from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify, make_response
+from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime, date, timedelta, UTC
 import os
 from sqlalchemy import func
 from reports import ReportGenerator
+from flask import make_response
 
 # Role-based access control constants
 ATTENDANCE_WRITE_ROLES = ['Supervisor', 
-                          'Business Support Officer']
+'Business Support Officer']
 
 app = Flask(__name__)
 
-# --- Application Configuration ---
-
-# Load the SECRET_KEY securely from environment variables, falling back to a dummy key for local development only.
+# SECURITY FIX: Use environment variable for the Secret Key
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'some-fallback-for-local-dev-only')
 
-# Get the database URL from environment variables for deployment.
-database_url = os.environ.get("DATABASE_URL")
+# FUNCTIONAL FIX: Add SQLite fallback for local development
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get("DATABASE_URL", "sqlite:///site.db")
 
-# CRITICAL DEPLOYMENT FIX: Fix the common dialect issue for SQLAlchemy when using PostgreSQL.
-if database_url and database_url.startswith("postgres://"):
-    database_url = database_url.replace("postgres://", "postgresql://", 1)
-
-# Use the configured/fixed production URL, or fallback to local SQLite for development.
-app.config['SQLALCHEMY_DATABASE_URI'] = database_url or "sqlite:///site.db"
-
-# Setting this to False silences a deprecation warning and saves resources.
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-# Initialize the SQLAlchemy object
 db = SQLAlchemy(app)
-
 
 # The list of roles authorized to view management reports
 REPORTING_ROLES = [
@@ -51,7 +40,7 @@ class User(db.Model):
     username = db.Column(db.String(80), unique=True, nullable=False)
     password = db.Column(db.String(200), nullable=False)
     role = db.Column(db.String(100), nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.now(UTC))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 class Company(db.Model):
     id = db.Column(db.Integer, primary_key=True)
