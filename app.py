@@ -5,6 +5,10 @@ import os
 from sqlalchemy import func
 from reports import ReportGenerator
 from flask import make_response
+from flask_migrate import Migrate
+
+
+
 
 # Role-based access control constants
 ATTENDANCE_WRITE_ROLES = ['Supervisor', 
@@ -21,6 +25,8 @@ app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get("DATABASE_URL", "sqlite:/
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
+
+migrate = Migrate(app, db)
 
 # The list of roles authorized to view management reports
 REPORTING_ROLES = [
@@ -444,6 +450,7 @@ def init_database():
     """Initialize database with sample data"""
     with app.app_context():
         db.create_all()
+        print("Database tables created successfully.")
         
         # Check if data already exists
         if User.query.first():
