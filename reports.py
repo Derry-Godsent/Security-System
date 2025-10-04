@@ -9,6 +9,7 @@ import csv
 from datetime import datetime, date, timedelta
 from sqlalchemy import func, and_
 
+
 class ReportGenerator:
     def __init__(self, db, Guard, Attendance, Location, Company):
         self.db = db

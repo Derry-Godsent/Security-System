@@ -1,23 +1,37 @@
-from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify
+from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify, make_response
 from flask_sqlalchemy import SQLAlchemy
-from datetime import datetime, date
-import json
+from datetime import datetime, date, timedelta, UTC
 import os
 from sqlalchemy import func
 from reports import ReportGenerator
-from flask import make_response
-import io
 
 # Role-based access control constants
-ATTENDANCE_WRITE_ROLES = ['Supervisor', 'Business Support Officer']
+ATTENDANCE_WRITE_ROLES = ['Supervisor', 
+                          'Business Support Officer']
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'your-secret-key-here'
-import os
-app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv("DATABASE_URL")
+
+# --- Application Configuration ---
+
+# Load the SECRET_KEY securely from environment variables, falling back to a dummy key for local development only.
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'some-fallback-for-local-dev-only')
+
+# Get the database URL from environment variables for deployment.
+database_url = os.environ.get("DATABASE_URL")
+
+# CRITICAL DEPLOYMENT FIX: Fix the common dialect issue for SQLAlchemy when using PostgreSQL.
+if database_url and database_url.startswith("postgres://"):
+    database_url = database_url.replace("postgres://", "postgresql://", 1)
+
+# Use the configured/fixed production URL, or fallback to local SQLite for development.
+app.config['SQLALCHEMY_DATABASE_URI'] = database_url or "sqlite:///site.db"
+
+# Setting this to False silences a deprecation warning and saves resources.
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
+# Initialize the SQLAlchemy object
 db = SQLAlchemy(app)
+
 
 # The list of roles authorized to view management reports
 REPORTING_ROLES = [
@@ -37,7 +51,7 @@ class User(db.Model):
     username = db.Column(db.String(80), unique=True, nullable=False)
     password = db.Column(db.String(200), nullable=False)
     role = db.Column(db.String(100), nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=datetime.now(UTC))
 
 class Company(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -448,13 +462,13 @@ def init_database():
         
         # Create users
         users_data = [
-            {"username": "Supervisor", "password": "1234", "role": "Supervisor"},
-            {"username": "Ops Manager", "password": "1234", "role": "Ops Manager"},
-            {"username": "HR Manager", "password": "1234", "role": "HR Officer"},
-            {"username": "Accountant", "password": "1234", "role": "Accountant"},
-            {"username": "Training Officer", "password": "1234", "role": "Training Officer"},
-            {"username": "BSO", "password": "1234", "role": "Business Support Officer"},
-            {"username": "GM", "password": "1234", "role": "General Manager"}
+            {"username": "supervisor", "password": "1234", "role": "Supervisor"},
+            {"username": "ops", "password": "1234", "role": "Ops Manager"},
+            {"username": "hr", "password": "1234", "role": "HR Officer"},
+            {"username": "finance", "password": "1234", "role": "Finance"},
+            {"username": "training", "password": "1234", "role": "Training Officer"},
+            {"username": "bso", "password": "1234", "role": "Business Support Officer"},
+            {"username": "gm", "password": "1234", "role": "General Manager"}
         ]
         
         for user_data in users_data:
@@ -514,9 +528,9 @@ def init_database():
             {'name': 'OM Kasoa', 'company_id': minor.id, 'is_accessible': True},
             
             # ACCRA MINOR (restricted access)
-            {'name': 'Accra Tenesse', 'company_id': minor.id, 'is_accessible': False},
-            {'name': 'Major Senyo', 'company_id': minor.id, 'is_accessible': False},
-            {'name': 'ICGC', 'company_id': minor.id, 'is_accessible': False},
+            {'name': 'Accra Tenesse', 'company_id': minor.id, 'is_accessible': True},
+            {'name': 'Major Senyo', 'company_id': minor.id, 'is_accessible': True},
+            {'name': 'ICGC', 'company_id': minor.id, 'is_accessible': True},
         ]
         
         for loc_data in locations_data:
@@ -1607,5 +1621,9 @@ if __name__ == '__main__':
     print("👥 Users created for all roles")
     print("📍 Locations and guards populated")
     print("🔐 Login with: supervisor/1234, ops/1234, hr/1234, etc.")
+
+    with app.app_context():
+        db.create_all()
+        print("Database tables created successfully.")
     
     app.run(debug=True)
