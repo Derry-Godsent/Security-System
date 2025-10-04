@@ -853,35 +853,35 @@ def attendance():
 def view_attendance():
     if 'username' not in session:
         return redirect(url_for('login'))
-    
-    # Subquery to find the most recent comment for each guard and date
+
+    # Subquery for latest comment per guard per date
     subquery = db.session.query(
         GuardComment.guard_id,
         func.date(GuardComment.created_at).label('comment_date'),
         GuardComment.comment
-    ).filter(GuardComment.is_active == True)\
-    .order_by(GuardComment.created_at.desc())\
-    .distinct(GuardComment.guard_id, func.date(GuardComment.created_at)).subquery()
+    ).filter(GuardComment.is_active == True) \
+     .order_by(GuardComment.created_at.desc()) \
+     .distinct(GuardComment.guard_id, func.date(GuardComment.created_at)) \
+     .subquery()
 
-    # Main query joins attendance with the subquery to get the latest comment
+    # Main query
     attendance_records = db.session.query(
         Attendance, Guard, Location, Company, subquery.c.comment
-    ).join(
-        Guard, Attendance.guard_id == Guard.id
-    ).join(
-        Location, Guard.location_id == Location.id
-    ).join(
-        Company, Location.company_id == Company.id
-    ).outerjoin(
-        subquery,
-        (Attendance.guard_id == subquery.c.guard_id) & (Attendance.date == subquery.c.comment_date)
-    ).order_by(Attendance.date.desc(), Attendance.timestamp.desc()).all()
-    
-    # Now, each item in attendance_records is a tuple: (Attendance, Guard, Location, Company, comment_text)
-    # You need to manually assign the comment to the attendance object for your template to work as is.
+    ).join(Guard, Attendance.guard_id == Guard.id) \
+     .join(Location, Guard.location_id == Location.id) \
+     .join(Company, Location.company_id == Company.id) \
+     .outerjoin(
+         subquery,
+         (Attendance.guard_id == subquery.c.guard_id) &
+         (Attendance.date == subquery.c.comment_date)
+     ) \
+     .order_by(Attendance.date.desc(), Attendance.timestamp.desc()) \
+     .all()
+
+    # Attach comment to Attendance object (safe for template)
     processed_records = []
     for attendance, guard, location, company, comment_text in attendance_records:
-        attendance.notes = comment_text # Attach the comment to the attendance object
+        attendance.notes = comment_text or ""  # fallback if no comment
         processed_records.append((attendance, guard, location, company))
 
     return render_template('view_attendance.html', attendance_records=processed_records)
