@@ -95,84 +95,102 @@
 <body class="bg-gray-100 text-gray-800 flex flex-col min-h-screen">
 
     <nav class="bg-panos-black text-white shadow-lg sticky top-0 z-50">
-    <div class="container mx-auto px-6 py-3 md:flex md:justify-between md:items-center">
-        <div class="flex items-center justify-between">
+    <div class="container mx-auto px-6 py-3">
+        <div class="flex justify-between items-center">
+            <!-- Logo -->
             <a href="{{ url_for('dashboard') }}" class="flex items-center text-xl font-bold transition-all duration-300 transform hover:scale-105">
                 <svg class="h-8 w-8 text-panos-yellow mr-3" fill="currentColor" viewBox="0 0 20 20">
                     <path d="M10 18a8 8 0 100-16 8 8 0 000 16zm-5.744-1.256A6 6 0 1114.744 1.256a7.975 7.975 0 00-4.744 16.744z"/>
                 </svg>
-                <span>PANOS SECURITY SERVICES LTD</span>
+                <span class="hidden md:inline">PANOS SECURITY SERVICES LTD</span>
+                <span class="md:hidden">PANOS</span>
             </a>
-        </div>
 
-        <div id="mobile-menu" class="hidden md:flex flex-col md:flex-row md:items-center md:space-x-8 mt-4 md:mt-0">
-            {% if 'username' in session %}
-                <a href="{{ url_for('dashboard') }}" class="py-2 px-3 hover:text-panos-yellow transition duration-300">Dashboard</a>
-                {% if session.get('role') in ['Supervisor', 'Business Support Officer'] %}
-                <a href="{{ url_for('attendance') }}" class="py-2 px-3 hover:text-panos-yellow transition duration-300">Attendance</a>
-                {% endif %}
-                <a href="{{ url_for('view_attendance') }}" class="py-2 px-3 hover:text-panos-yellow transition duration-300">Records</a>
-                <a href="{{ url_for('view_requests') }}" class="py-2 px-3 hover:text-panos-yellow transition duration-300">Requests</a>
-                {% if session.get('role') in ['Ops Manager', 'HR Officer', 'Finance', 'General Manager'] %}
-                <a href="{{ url_for('reports_page') }}" class="py-2 px-3 hover:text-panos-yellow transition duration-300">Reports</a>
-                {% endif %}
-                {% endif %}
-        </div>
-        
-        <div class="flex items-center space-x-4">
-            {% if 'username' in session %}
-                <!-- Notifications -->
-                <div class="relative">
-                    <button id="notificationBell" 
-                            class="relative p-2 text-gray-300 hover:text-yellow-400 transition-colors duration-300"
-                            onclick="toggleNotifications()">
-                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
-                                  d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path>
-                        </svg>
-                        <!-- Notification Badge -->
-                        <span id="notificationBadge" 
-                              class="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center hidden font-medium">
-                            0
-                        </span>
-                    </button>
+            <!-- Desktop Menu -->
+            <div class="hidden md:flex items-center space-x-6">
+                {% if 'username' in session %}
+                    <a href="{{ url_for('dashboard') }}" class="hover:text-panos-yellow transition duration-300">Dashboard</a>
+                    {% if session.get('role') in ['Supervisor', 'Business Support Officer'] %}
+                    <a href="{{ url_for('attendance') }}" class="hover:text-panos-yellow transition duration-300">Attendance</a>
+                    {% endif %}
+                    <a href="{{ url_for('view_attendance') }}" class="hover:text-panos-yellow transition duration-300">Records</a>
+                    <a href="{{ url_for('view_requests') }}" class="hover:text-panos-yellow transition duration-300">Requests</a>
+                    {% if session.get('role') in ['Ops Manager', 'HR Officer', 'Finance', 'General Manager', 'Business Support Officer'] %}
+                    <a href="{{ url_for('reports_page') }}" class="hover:text-panos-yellow transition duration-300">Reports</a>
+                    {% endif %}
                     
-                    <!-- Notification Dropdown -->
-                    <div id="notificationDropdown" 
-                         class="hidden absolute right-0 top-12 w-80 bg-white rounded-lg shadow-xl border border-gray-200 z-50 max-h-96 overflow-hidden">
-                        <!-- Header -->
-                        <div class="bg-gradient-to-r from-panos-black to-gray-800 text-white px-4 py-3 flex justify-between items-center rounded-t-lg">
-                            <h3 class="font-semibold text-panos-yellow">Notifications</h3>
-                            <button onclick="markAllAsRead()" 
-                                    class="text-xs text-gray-300 hover:text-panos-yellow transition font-medium">
-                                Mark all read
-                            </button>
-                        </div>
+                    <!-- Notifications (Desktop) -->
+                    <div class="relative">
+                        <button id="notificationBell" 
+                                class="relative p-2 text-gray-300 hover:text-yellow-400 transition-colors duration-300"
+                                onclick="toggleNotifications()">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                      d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path>
+                            </svg>
+                            <span id="notificationBadge" 
+                                  class="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center hidden font-medium">
+                                0
+                            </span>
+                        </button>
                         
-                        <!-- Notifications List -->
-                        <div id="notificationsList" class="max-h-80 overflow-y-auto">
-                            <div class="p-4 text-center text-gray-500">
-                                <svg class="w-8 h-8 mx-auto mb-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path>
-                                </svg>
-                                Loading notifications...
+                        <!-- Notification Dropdown -->
+                        <div id="notificationDropdown" 
+                             class="hidden absolute right-0 top-12 w-80 bg-white rounded-lg shadow-xl border border-gray-200 z-50 max-h-96 overflow-hidden">
+                            <div class="bg-gradient-to-r from-panos-black to-gray-800 text-white px-4 py-3 flex justify-between items-center rounded-t-lg">
+                                <h3 class="font-semibold text-panos-yellow">Notifications</h3>
+                                <button onclick="markAllAsRead()" 
+                                        class="text-xs text-gray-300 hover:text-panos-yellow transition font-medium">
+                                    Mark all read
+                                </button>
+                            </div>
+                            <div id="notificationsList" class="max-h-80 overflow-y-auto">
+                                <div class="p-4 text-center text-gray-500">
+                                    <svg class="w-8 h-8 mx-auto mb-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path>
+                                    </svg>
+                                    Loading notifications...
+                                </div>
                             </div>
                         </div>
                     </div>
-                </div>
-
-                <div class="hidden md:block">
+                    
                     <span class="text-sm font-medium">Hello, {{ session.get('role') }}</span>
-                    <a href="{{ url_for('logout') }}" class="ml-4 text-sm font-semibold text-red-400 hover:text-red-500 transition duration-300">Logout</a>
-                </div>
+                    <a href="{{ url_for('logout') }}" class="text-sm font-semibold text-red-400 hover:text-red-500 transition duration-300">Logout</a>
+                {% endif %}
+            </div>
+            
+            <!-- Mobile Menu Button -->
+            {% if 'username' in session %}
+            <button id="mobile-menu-button" type="button" class="md:hidden text-gray-400 hover:text-white focus:outline-none">
+                <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7"></path>
+                </svg>
+            </button>
             {% endif %}
         </div>
-        
-        <button id="mobile-menu-button" type="button" class="md:hidden text-gray-400 hover:text-white focus:outline-none">
-            <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7"></path>
-            </svg>
-        </button>
+
+        <!-- Mobile Menu (Full) -->
+        {% if 'username' in session %}
+        <div id="mobile-menu" class="hidden md:hidden mt-4 pb-4 border-t border-gray-700 pt-4">
+            <div class="flex flex-col space-y-3">
+                <a href="{{ url_for('dashboard') }}" class="py-2 px-3 hover:text-panos-yellow transition duration-300 hover:bg-gray-800 rounded">Dashboard</a>
+                {% if session.get('role') in ['Supervisor', 'Business Support Officer'] %}
+                <a href="{{ url_for('attendance') }}" class="py-2 px-3 hover:text-panos-yellow transition duration-300 hover:bg-gray-800 rounded">Attendance</a>
+                {% endif %}
+                <a href="{{ url_for('view_attendance') }}" class="py-2 px-3 hover:text-panos-yellow transition duration-300 hover:bg-gray-800 rounded">Records</a>
+                <a href="{{ url_for('view_requests') }}" class="py-2 px-3 hover:text-panos-yellow transition duration-300 hover:bg-gray-800 rounded">Requests</a>
+                {% if session.get('role') in ['Ops Manager', 'HR Officer', 'Finance', 'General Manager', 'Business Support Officer'] %}
+                <a href="{{ url_for('reports_page') }}" class="py-2 px-3 hover:text-panos-yellow transition duration-300 hover:bg-gray-800 rounded">Reports</a>
+                {% endif %}
+                
+                <div class="border-t border-gray-700 pt-3 mt-2">
+                    <div class="py-2 px-3 text-sm text-gray-400">{{ session.get('role') }}</div>
+                    <a href="{{ url_for('logout') }}" class="py-2 px-3 text-red-400 hover:text-red-500 transition duration-300 hover:bg-gray-800 rounded block">Logout</a>
+                </div>
+            </div>
+        </div>
+        {% endif %}
     </div>
 </nav>
     
