@@ -2,13 +2,48 @@ from flask import Flask, render_template, request, redirect, url_for, session, f
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime, date, timedelta, UTC
 import os
+import logging
+import base64
 from sqlalchemy import func
 from reports import ReportGenerator
 from flask import make_response
 from flask_migrate import Migrate
 from flask_bcrypt import Bcrypt
+from urllib.parse import urlparse
+from flask_login import (
+    LoginManager, UserMixin, login_user, logout_user, current_user, login_required
+)
+from flask_bcrypt import Bcrypt
+from sqlalchemy import text, event
+from sqlalchemy.engine import Engine
+from sqlalchemy.orm import relationship
 
 
+# Set up logging for Firebase diagnostics
+logging.basicConfig(level=logging.INFO)
+
+# --- Library Imports ---
+from flask import (
+    Flask, render_template, request, session, redirect, url_for, flash, jsonify
+)
+
+# --- Global Configuration ---
+# Set up default configuration from environment variables or sensible defaults
+basedir = os.path.abspath(os.path.dirname(__file__))
+
+# Fetch global variables provided by the Canvas environment
+app_id = os.environ.get('CANVAS_APP_ID', 'security-system-default')
+
+# Database URL configuration (use environment variable for Render/Neon)
+DATABASE_URL = os.environ.get('DATABASE_URL')
+if DATABASE_URL is None:
+    # Default to SQLite for local development if DB_URL is not set
+    SQLALCHEMY_DATABASE_URI = 'sqlite:///' + os.path.join(basedir, 'app.db')
+else:
+    # Convert 'postgres' scheme to 'postgresql' required by SQLAlchemy
+    if DATABASE_URL.startswith("postgres://"):
+        DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+    SQLALCHEMY_DATABASE_URI = DATABASE_URL
 
 
 # Role-based access control constants
@@ -29,6 +64,16 @@ db = SQLAlchemy(app)
 
 migrate = Migrate(app, db)
 
+bcrypt = Bcrypt(app)
+login_manager = LoginManager(app)
+login_manager.login_view = 'login'
+login_manager.login_message_category = 'info'
+
+@login_manager.user_loader
+def load_user(user_id):
+    """Callback for loading a user from the database given their ID."""
+    return User.query.get(int(user_id))
+
 # The list of roles authorized to view management reports
 REPORTING_ROLES = [
     'Ops Manager',
@@ -42,12 +87,20 @@ REPORTING_ROLES = [
 # DATABASE MODELS
 # ============================================================================
 
-class User(db.Model):
+class User(db.Model, UserMixin):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
     password = db.Column(db.String(200), nullable=False)
     role = db.Column(db.String(50), nullable=False, default='Employee')
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(UTC))
+
+    def set_password(self, password):
+        """Hashes and sets the password."""
+        self.password_hash = bcrypt.generate_password_hash(password).decode('utf-8')
+
+    def check_password(self, password):
+        """Checks the provided password against the stored hash."""
+        return bcrypt.check_password_hash(self.password_hash, password)
 
     def __repr__(self):
         return f"User('{self.username}', '{self.role}')"
@@ -459,8 +512,9 @@ def init_database():
         db.create_all()
         print("Database tables created successfully.")
         
-        user.query.delete()
-        db.session.commit()
+        # Check if data already exists
+        if User.query.first():
+            return
         
         # Create users
         users_data = [
@@ -477,9 +531,6 @@ def init_database():
         for user_data in users_data:
             user = User(**user_data)
             db.session.add(user)
-
-        db.session.commit()
-        print("User accounts reset successfully.")
         
         # Create companies
         companies = [
@@ -1995,27 +2046,46 @@ def create_db_tables():
         print("Database tables created successfully.")
         
         # 2. Seed initial users if none exist
-        if User.query.first() is None:
-            print("Seeding initial users...")
-            login_info = [] # List to display login info (without sensitive passwords)
+        users_added_or_updated = 0
+        for username, password, role in DEFAULT_USERS:
+            # Try to find the user by username
+            user = User.query.filter_by(username=username).first()
 
-            for user_data in initial_users_data:
-                # CRITICAL: Hash the password using bcrypt for security
-                hashed_password = bcrypt.generate_password_hash(user_data["password"]).decode('utf-8')
-                
-                new_user = User(
-                    username=user_data["username"],
-                    password=hashed_password,
-                    role=user_data["role"]
-                    # email is optional, leaving it out for now
-                )
+            if user:
+                # User exists: Update the password and role to ensure they match the latest code
+                user.set_password(password)
+                user.role = role
+                db.session.add(user)
+                print(f"UPSERT: Updated password for existing user: {username}")
+                users_added_or_updated += 1
+            else:
+                # User does not exist: Create and save the new user
+                new_user = User(username=username, role=role)
+                new_user.set_password(password)
                 db.session.add(new_user)
-                login_info.append(f"{user_data['username']}/<password_hidden>")
+                print(f"UPSERT: Created new user: {username}")
+                users_added_or_updated += 1
             
+        if users_added_or_updated > 0:
             db.session.commit()
-            print(f"👥 Users created for all roles: {', '.join(login_info)}")
+            print(f"--- Successfully completed data UPSERT: {users_added_or_updated} users checked/updated. ---")
         else:
-            print("Users already exist. Skipping initial seeding.")
+            print("--- No default users to upsert. ---")
+
+# --- Utility Functions ---
+
+def requires_role(required_role):
+    """Decorator to enforce role-based access control."""
+    def wrapper(f):
+        @login_required
+        def decorated_function(*args, **kwargs):
+            if current_user.role != required_role and current_user.role != 'admin':
+                flash('You do not have the required permissions to access this page.', 'danger')
+                return redirect(url_for('home'))
+            return f(*args, **kwargs)
+        return decorated_function
+    return wrapper
+
 
 
 if __name__ == '__main__':
