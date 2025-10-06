@@ -1,0 +1,715 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard - PANOS Security</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .stat-card { transition: all 0.3s ease; }
+        .stat-card:hover { transform: translateY(-5px); box-shadow: 0 10px 25px rgba(0,0,0,0.15); }
+        .tab-button { transition: all 0.2s; }
+        .tab-button.active { background: #DC2626; color: white; }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <div class="min-h-screen">
+        <!-- Header -->
+        <header class="bg-gradient-to-r from-red-600 to-red-700 text-white shadow-xl">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+                <div class="flex justify-between items-center">
+                    <div>
+                        <h1 class="text-3xl font-bold">System Administration</h1>
+                        <p class="text-red-100 mt-1">Manage guards, locations, and system settings</p>
+                    </div>
+                    <a href="/dashboard" class="bg-white text-red-600 px-6 py-2 rounded-lg font-semibold hover:bg-red-50 transition">
+                        ← Back to Dashboard
+                    </a>
+                </div>
+            </div>
+        </header>
+
+        <!-- Statistics Cards -->
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div class="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8">
+                <div class="stat-card bg-white rounded-xl shadow-lg p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-gray-500 text-sm font-medium">Total Guards</p>
+                            <h3 class="text-3xl font-bold text-gray-800 mt-2">{{ stats.total_guards }}</h3>
+                        </div>
+                        <div class="bg-blue-100 p-3 rounded-full">
+                            <svg class="h-8 w-8 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                                <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z"/>
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="stat-card bg-white rounded-xl shadow-lg p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-gray-500 text-sm font-medium">Active Guards</p>
+                            <h3 class="text-3xl font-bold text-green-600 mt-2">{{ stats.active_guards }}</h3>
+                        </div>
+                        <div class="bg-green-100 p-3 rounded-full">
+                            <svg class="h-8 w-8 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"/>
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="stat-card bg-white rounded-xl shadow-lg p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-gray-500 text-sm font-medium">Total Locations</p>
+                            <h3 class="text-3xl font-bold text-gray-800 mt-2">{{ stats.total_locations }}</h3>
+                        </div>
+                        <div class="bg-purple-100 p-3 rounded-full">
+                            <svg class="h-8 w-8 text-purple-600" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z"/>
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="stat-card bg-white rounded-xl shadow-lg p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-gray-500 text-sm font-medium">Active Locations</p>
+                            <h3 class="text-3xl font-bold text-green-600 mt-2">{{ stats.active_locations }}</h3>
+                        </div>
+                        <div class="bg-green-100 p-3 rounded-full">
+                            <svg class="h-8 w-8 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                                <path d="M10.394 2.08a1 1 0 00-.788 0l-7 3a1 1 0 000 1.84L5.25 8.051a.999.999 0 01.356-.257l4-1.714a1 1 0 11.788 1.838L7.667 9.088l1.94.831a1 1 0 00.787 0l7-3a1 1 0 000-1.838l-7-3zM3.31 9.397L5 10.12v4.102a8.969 8.969 0 00-1.05-.174 1 1 0 01-.89-.89 11.115 11.115 0 01.25-3.762zM9.3 16.573A9.026 9.026 0 007 14.935v-3.957l1.818.78a3 3 0 002.364 0l5.508-2.361a11.026 11.026 0 01.25 3.762 1 1 0 01-.89.89 8.968 8.968 0 00-5.35 2.524 1 1 0 01-1.4 0zM6 18a1 1 0 001-1v-2.065a8.935 8.935 0 00-2-.712V17a1 1 0 001 1z"/>
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="stat-card bg-white rounded-xl shadow-lg p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-gray-500 text-sm font-medium">System Users</p>
+                            <h3 class="text-3xl font-bold text-gray-800 mt-2">{{ stats.total_users }}</h3>
+                        </div>
+                        <div class="bg-yellow-100 p-3 rounded-full">
+                            <svg class="h-8 w-8 text-yellow-600" fill="currentColor" viewBox="0 0 20 20">
+                                <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3zM6 8a2 2 0 11-4 0 2 2 0 014 0zM16 18v-3a5.972 5.972 0 00-.75-2.906A3.005 3.005 0 0119 15v3h-3zM4.75 12.094A5.973 5.973 0 004 15v3H1v-3a3 3 0 013.75-2.906z"/>
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab Navigation -->
+            <div class="bg-white rounded-xl shadow-lg mb-8">
+                <div class="border-b border-gray-200">
+                    <nav class="flex space-x-4 px-6" id="tab-navigation">
+                        <button onclick="showTab('guards')" class="tab-button active py-4 px-6 font-semibold border-b-2 border-transparent">
+                            Guard Management
+                        </button>
+                        <button onclick="showTab('locations')" class="tab-button py-4 px-6 font-semibold border-b-2 border-transparent">
+                            Location Management
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Guards Tab -->
+                <div id="guards-tab" class="tab-content p-6">
+                    <div class="flex justify-between items-center mb-6">
+                        <h2 class="text-2xl font-bold text-gray-800">Guard Management</h2>
+                        <button onclick="showAddGuardModal()" class="bg-red-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-red-700 transition">
+                            + Add New Guard
+                        </button>
+                    </div>
+
+                    <!-- Guard Filters -->
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                        <input type="text" id="guard-search" placeholder="Search guards..." class="px-4 py-2 border rounded-lg" onkeyup="filterGuards()">
+                        <select id="company-filter" class="px-4 py-2 border rounded-lg" onchange="filterGuards()">
+                            <option value="">All Companies</option>
+                            <option value="TAYSEC">TAYSEC</option>
+                            <option value="G29">G29</option>
+                            <option value="BROLL">BROLL</option>
+                            <option value="MINOR">MINOR</option>
+                        </select>
+                        <select id="shift-filter" class="px-4 py-2 border rounded-lg" onchange="filterGuards()">
+                            <option value="">All Shifts</option>
+                            <option value="day">Day Shift</option>
+                            <option value="night">Night Shift</option>
+                        </select>
+                        <select id="status-filter" class="px-4 py-2 border rounded-lg" onchange="filterGuards()">
+                            <option value="">All Status</option>
+                            <option value="active">Active Only</option>
+                            <option value="inactive">Inactive Only</option>
+                        </select>
+                    </div>
+
+                    <!-- Guards Table -->
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full bg-white">
+                            <thead class="bg-gray-100">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Location</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Company</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Shift</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Role</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="guards-table-body" class="divide-y divide-gray-200">
+                                <!-- Populated by JavaScript -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Locations Tab -->
+                <div id="locations-tab" class="tab-content p-6 hidden">
+                    <div class="flex justify-between items-center mb-6">
+                        <h2 class="text-2xl font-bold text-gray-800">Location Management</h2>
+                        <button onclick="showAddLocationModal()" class="bg-red-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-red-700 transition">
+                            + Add New Location
+                        </button>
+                    </div>
+
+                    <!-- Location Filters -->
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                        <input type="text" id="location-search" placeholder="Search locations..." class="px-4 py-2 border rounded-lg" onkeyup="filterLocations()">
+                        <select id="location-company-filter" class="px-4 py-2 border rounded-lg" onchange="filterLocations()">
+                            <option value="">All Companies</option>
+                            <option value="TAYSEC">TAYSEC</option>
+                            <option value="G29">G29</option>
+                            <option value="BROLL">BROLL</option>
+                            <option value="MINOR">MINOR</option>
+                        </select>
+                        <select id="location-status-filter" class="px-4 py-2 border rounded-lg" onchange="filterLocations()">
+                            <option value="">All Status</option>
+                            <option value="active">Active Only</option>
+                            <option value="inactive">Inactive Only</option>
+                        </select>
+                    </div>
+
+                    <!-- Locations Table -->
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full bg-white">
+                            <thead class="bg-gray-100">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Location Name</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Company</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total Guards</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Active Guards</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="locations-table-body" class="divide-y divide-gray-200">
+                                <!-- Populated by JavaScript -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Guard Modal -->
+    <div id="add-guard-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+        <div class="bg-white rounded-xl shadow-2xl max-w-md w-full mx-4">
+            <div class="bg-red-600 text-white px-6 py-4 rounded-t-xl">
+                <h3 class="text-xl font-bold">Add New Guard</h3>
+            </div>
+            <form id="add-guard-form" class="p-6 space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Guard Name</label>
+                    <input type="text" id="new-guard-name" required class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-red-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Location</label>
+                    <select id="new-guard-location" required class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-red-500">
+                        <!-- Populated by JavaScript -->
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Shift</label>
+                    <select id="new-guard-shift" required class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-red-500">
+                        <option value="day">Day Shift</option>
+                        <option value="night">Night Shift</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Role</label>
+                    <select id="new-guard-role" required class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-red-500">
+                        <option value="guard">Guard</option>
+                        <option value="supervisor">Supervisor</option>
+                        <option value="driver">Driver</option>
+                    </select>
+                </div>
+                <div class="flex justify-end space-x-3 pt-4">
+                    <button type="button" onclick="closeAddGuardModal()" class="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">Cancel</button>
+                    <button type="submit" class="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">Add Guard</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Add Location Modal -->
+    <div id="add-location-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+        <div class="bg-white rounded-xl shadow-2xl max-w-md w-full mx-4">
+            <div class="bg-red-600 text-white px-6 py-4 rounded-t-xl">
+                <h3 class="text-xl font-bold">Add New Location</h3>
+            </div>
+            <form id="add-location-form" class="p-6 space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Location Name</label>
+                    <input type="text" id="new-location-name" required class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-red-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Company</label>
+                    <select id="new-location-company" required class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-red-500">
+                        <!-- Populated by JavaScript -->
+                    </select>
+                </div>
+                <div class="flex items-center">
+                    <input type="checkbox" id="new-location-active" checked class="h-4 w-4 text-red-600 focus:ring-red-500 border-gray-300 rounded">
+                    <label for="new-location-active" class="ml-2 block text-sm text-gray-700">Location is active</label>
+                </div>
+                <div class="flex justify-end space-x-3 pt-4">
+                    <button type="button" onclick="closeAddLocationModal()" class="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">Cancel</button>
+                    <button type="submit" class="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">Add Location</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Edit Guard Modal -->
+    <div id="edit-guard-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+        <div class="bg-white rounded-xl shadow-2xl max-w-md w-full mx-4">
+            <div class="bg-red-600 text-white px-6 py-4 rounded-t-xl">
+                <h3 class="text-xl font-bold">Edit Guard</h3>
+            </div>
+            <form id="edit-guard-form" class="p-6 space-y-4">
+                <input type="hidden" id="edit-guard-id">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Guard Name</label>
+                    <input type="text" id="edit-guard-name" required class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-red-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Location</label>
+                    <select id="edit-guard-location" required class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-red-500">
+                        <!-- Populated by JavaScript -->
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Shift</label>
+                    <select id="edit-guard-shift" required class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-red-500">
+                        <option value="day">Day Shift</option>
+                        <option value="night">Night Shift</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Role</label>
+                    <select id="edit-guard-role" required class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-red-500">
+                        <option value="guard">Guard</option>
+                        <option value="supervisor">Supervisor</option>
+                        <option value="driver">Driver</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Notes</label>
+                    <textarea id="edit-guard-notes" rows="3" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-red-500"></textarea>
+                </div>
+                <div class="flex justify-end space-x-3 pt-4">
+                    <button type="button" onclick="closeEditGuardModal()" class="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">Cancel</button>
+                    <button type="submit" class="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        let allGuards = [];
+        let allLocations = [];
+        let allCompanies = [];
+
+        // Load initial data
+        document.addEventListener('DOMContentLoaded', function() {
+            loadGuards();
+            loadLocations();
+            loadCompanies();
+        });
+
+        // Tab switching
+        function showTab(tabName) {
+            document.querySelectorAll('.tab-content').forEach(tab => tab.classList.add('hidden'));
+            document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
+            
+            document.getElementById(tabName + '-tab').classList.remove('hidden');
+            event.target.classList.add('active');
+        }
+
+        // Load Guards
+        async function loadGuards() {
+            try {
+                const response = await fetch('/api/admin/guards');
+                allGuards = await response.json();
+                renderGuards(allGuards);
+            } catch (error) {
+                console.error('Error loading guards:', error);
+            }
+        }
+
+        // Render Guards Table
+        function renderGuards(guards) {
+            const tbody = document.getElementById('guards-table-body');
+            tbody.innerHTML = '';
+
+            guards.forEach(guard => {
+                const statusBadge = guard.is_active 
+                    ? '<span class="px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">Active</span>'
+                    : '<span class="px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">Inactive</span>';
+
+                const row = `
+                    <tr>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${guard.name}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${guard.location_name}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${guard.company_name}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${guard.shift_type}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${guard.role}</td>
+                        <td class="px-6 py-4 whitespace-nowrap">${statusBadge}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                            <button onclick="editGuard(${guard.id})" class="text-blue-600 hover:text-blue-900 mr-3">Edit</button>
+                            ${guard.is_active 
+                                ? `<button onclick="deactivateGuard(${guard.id}, '${guard.name}')" class="text-red-600 hover:text-red-900">Deactivate</button>`
+                                : `<button onclick="reactivateGuard(${guard.id}, '${guard.name}')" class="text-green-600 hover:text-green-900">Reactivate</button>`
+                            }
+                        </td>
+                    </tr>
+                `;
+                tbody.innerHTML += row;
+            });
+        }
+
+        // Filter Guards
+        function filterGuards() {
+            const searchTerm = document.getElementById('guard-search').value.toLowerCase();
+            const company = document.getElementById('company-filter').value;
+            const shift = document.getElementById('shift-filter').value;
+            const status = document.getElementById('status-filter').value;
+
+            const filtered = allGuards.filter(guard => {
+                const matchesSearch = guard.name.toLowerCase().includes(searchTerm) || 
+                                     guard.location_name.toLowerCase().includes(searchTerm);
+                const matchesCompany = !company || guard.company_name === company;
+                const matchesShift = !shift || guard.shift_type === shift;
+                const matchesStatus = !status || 
+                                     (status === 'active' && guard.is_active) || 
+                                     (status === 'inactive' && !guard.is_active);
+
+                return matchesSearch && matchesCompany && matchesShift && matchesStatus;
+            });
+
+            renderGuards(filtered);
+        }
+
+        // Load Locations
+        async function loadLocations() {
+            try {
+                const response = await fetch('/api/admin/locations');
+                allLocations = await response.json();
+                renderLocations(allLocations);
+                populateLocationDropdowns();
+            } catch (error) {
+                console.error('Error loading locations:', error);
+            }
+        }
+
+        // Render Locations Table
+        function renderLocations(locations) {
+            const tbody = document.getElementById('locations-table-body');
+            tbody.innerHTML = '';
+
+            locations.forEach(location => {
+                const statusBadge = location.is_accessible 
+                    ? '<span class="px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">Active</span>'
+                    : '<span class="px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">Inactive</span>';
+
+                const row = `
+                    <tr>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${location.name}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${location.company_name}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${location.guard_count}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${location.active_guard_count}</td>
+                        <td class="px-6 py-4 whitespace-nowrap">${statusBadge}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                            <button onclick="toggleLocation(${location.id}, '${location.name}', ${location.is_accessible})" 
+                                class="${location.is_accessible ? 'text-red-600 hover:text-red-900' : 'text-green-600 hover:text-green-900'}">
+                                ${location.is_accessible ? 'Deactivate' : 'Activate'}
+                            </button>
+                        </td>
+                    </tr>
+                `;
+                tbody.innerHTML += row;
+            });
+        }
+
+        // Filter Locations
+        function filterLocations() {
+            const searchTerm = document.getElementById('location-search').value.toLowerCase();
+            const company = document.getElementById('location-company-filter').value;
+            const status = document.getElementById('location-status-filter').value;
+
+            const filtered = allLocations.filter(location => {
+                const matchesSearch = location.name.toLowerCase().includes(searchTerm);
+                const matchesCompany = !company || location.company_name === company;
+                const matchesStatus = !status || 
+                                     (status === 'active' && location.is_accessible) || 
+                                     (status === 'inactive' && !location.is_accessible);
+
+                return matchesSearch && matchesCompany && matchesStatus;
+            });
+
+            renderLocations(filtered);
+        }
+
+        // Load Companies
+        async function loadCompanies() {
+            try {
+                const response = await fetch('/api/admin/companies');
+                allCompanies = await response.json();
+                populateCompanyDropdowns();
+            } catch (error) {
+                console.error('Error loading companies:', error);
+            }
+        }
+
+        // Populate dropdowns
+        function populateLocationDropdowns() {
+            const selects = ['new-guard-location', 'edit-guard-location'];
+            selects.forEach(selectId => {
+                const select = document.getElementById(selectId);
+                select.innerHTML = '<option value="">Select Location</option>';
+                allLocations.filter(l => l.is_accessible).forEach(location => {
+                    select.innerHTML += `<option value="${location.id}">${location.name} (${location.company_name})</option>`;
+                });
+            });
+        }
+
+        function populateCompanyDropdowns() {
+            const select = document.getElementById('new-location-company');
+            select.innerHTML = '<option value="">Select Company</option>';
+            allCompanies.forEach(company => {
+                select.innerHTML += `<option value="${company.id}">${company.name}</option>`;
+            });
+        }
+
+        // Modal Functions
+        function showAddGuardModal() {
+            document.getElementById('add-guard-modal').classList.remove('hidden');
+            document.getElementById('add-guard-modal').classList.add('flex');
+        }
+
+        function closeAddGuardModal() {
+            document.getElementById('add-guard-modal').classList.add('hidden');
+            document.getElementById('add-guard-form').reset();
+        }
+
+        function showAddLocationModal() {
+            document.getElementById('add-location-modal').classList.remove('hidden');
+            document.getElementById('add-location-modal').classList.add('flex');
+        }
+
+        function closeAddLocationModal() {
+            document.getElementById('add-location-modal').classList.add('hidden');
+            document.getElementById('add-location-form').reset();
+        }
+
+        function closeEditGuardModal() {
+            document.getElementById('edit-guard-modal').classList.add('hidden');
+            document.getElementById('edit-guard-form').reset();
+        }
+
+        // Add Guard
+        document.getElementById('add-guard-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+
+            const data = {
+                name: document.getElementById('new-guard-name').value,
+                location_id: document.getElementById('new-guard-location').value,
+                shift_type: document.getElementById('new-guard-shift').value,
+                role: document.getElementById('new-guard-role').value
+            };
+
+            try {
+                const response = await fetch('/api/admin/guards', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(data)
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    alert(result.message);
+                    closeAddGuardModal();
+                    loadGuards();
+                } else {
+                    alert('Error: ' + result.error);
+                }
+            } catch (error) {
+                alert('Error adding guard: ' + error.message);
+            }
+        });
+
+        // Add Location
+        document.getElementById('add-location-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+
+            const data = {
+                name: document.getElementById('new-location-name').value,
+                company_id: document.getElementById('new-location-company').value,
+                is_accessible: document.getElementById('new-location-active').checked
+            };
+
+            try {
+                const response = await fetch('/api/admin/locations', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(data)
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    alert(result.message);
+                    closeAddLocationModal();
+                    loadLocations();
+                } else {
+                    alert('Error: ' + result.error);
+                }
+            } catch (error) {
+                alert('Error adding location: ' + error.message);
+            }
+        });
+
+        // Edit Guard
+        function editGuard(guardId) {
+            const guard = allGuards.find(g => g.id === guardId);
+            if (!guard) return;
+
+            document.getElementById('edit-guard-id').value = guard.id;
+            document.getElementById('edit-guard-name').value = guard.name;
+            document.getElementById('edit-guard-location').value = guard.location_id;
+            document.getElementById('edit-guard-shift').value = guard.shift_type;
+            document.getElementById('edit-guard-role').value = guard.role;
+            document.getElementById('edit-guard-notes').value = guard.notes || '';
+
+            document.getElementById('edit-guard-modal').classList.remove('hidden');
+            document.getElementById('edit-guard-modal').classList.add('flex');
+        }
+
+        document.getElementById('edit-guard-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+
+            const guardId = document.getElementById('edit-guard-id').value;
+            const data = {
+                name: document.getElementById('edit-guard-name').value,
+                location_id: document.getElementById('edit-guard-location').value,
+                shift_type: document.getElementById('edit-guard-shift').value,
+                role: document.getElementById('edit-guard-role').value,
+                notes: document.getElementById('edit-guard-notes').value
+            };
+
+            try {
+                const response = await fetch(`/api/admin/guards/${guardId}`, {
+                    method: 'PUT',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(data)
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    alert(result.message);
+                    closeEditGuardModal();
+                    loadGuards();
+                } else {
+                    alert('Error: ' + result.error);
+                }
+            } catch (error) {
+                alert('Error updating guard: ' + error.message);
+            }
+        });
+
+        // Deactivate/Reactivate Guard
+        async function deactivateGuard(guardId, guardName) {
+            const reason = prompt(`Reason for deactivating ${guardName}:`);
+            if (!reason) return;
+
+            try {
+                const response = await fetch(`/api/admin/guards/${guardId}/deactivate`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ 
+                        reason: reason,
+                        resigned_date: new Date().toISOString().split('T')[0]
+                    })
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    alert(result.message);
+                    loadGuards();
+                } else {
+                    alert('Error: ' + result.error);
+                }
+            } catch (error) {
+                alert('Error deactivating guard: ' + error.message);
+            }
+        }
+
+        async function reactivateGuard(guardId, guardName) {
+            if (!confirm(`Reactivate ${guardName}?`)) return;
+
+            try {
+                const response = await fetch(`/api/admin/guards/${guardId}/reactivate`, {
+                    method: 'POST'
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    alert(result.message);
+                    loadGuards();
+                } else {
+                    alert('Error: ' + result.error);
+                }
+            } catch (error) {
+                alert('Error reactivating guard: ' + error.message);
+            }
+        }
+
+        // Toggle Location
+        async function toggleLocation(locationId, locationName, currentStatus) {
+            const action = currentStatus ? 'deactivate' : 'activate';
+            if (!confirm(`Are you sure you want to ${action} ${locationName}?`)) return;
+
+            try {
+                const response = await fetch(`/api/admin/locations/${locationId}/toggle`, {
+                    method: 'POST'
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    alert(result.message);
+                    loadLocations();
+                } else {
+                    alert('Error: ' + result.error);
+                }
+            } catch (error) {
+                alert('Error toggling location: ' + error.message);
+            }
+        }
+    </script>
+</body>
+</html>

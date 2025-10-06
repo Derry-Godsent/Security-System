@@ -10,43 +10,123 @@
             <p class="text-gray-600">View and monitor guard attendance history</p>
         </div>
 
-        <!-- Filters Section -->
+        <!-- NEW: Company Quick Filters -->
+        <div class="flex flex-wrap gap-3 mb-6">
+            <a href="{{ url_for('view_attendance') }}" 
+               class="px-4 py-2 rounded-lg font-semibold transition {% if not filters.company %}bg-gray-800 text-white{% else %}bg-gray-200 text-gray-700 hover:bg-gray-300{% endif %}">
+                All Companies
+            </a>
+            {% for company in companies %}
+            <a href="{{ url_for('view_attendance', company=company.name) }}" 
+               class="px-4 py-2 rounded-lg font-semibold transition {% if filters.company == company.name %}bg-red-600 text-white{% else %}bg-gray-200 text-gray-700 hover:bg-gray-300{% endif %}">
+                {{ company.name }}
+            </a>
+            {% endfor %}
+        </div>
+
+        <!-- ENHANCED: Filters Section with new fields -->
         <div class="bg-white shadow-lg rounded-2xl p-6 mb-6">
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Filter by Date</label>
-                    <input type="date" id="filterDate" class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+            <h3 class="text-lg font-bold text-gray-800 mb-4">Filter Attendance Records</h3>
+            
+            <form method="GET" action="{{ url_for('view_attendance') }}">
+                <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                    <!-- Company Dropdown -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Company</label>
+                        <select name="company" class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-red-500">
+                            <option value="">All Companies</option>
+                            {% for company in companies %}
+                            <option value="{{ company.name }}" {% if filters.company == company.name %}selected{% endif %}>
+                                {{ company.name }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- Location Search -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Location</label>
+                        <input type="text" name="location" value="{{ filters.location }}" 
+                               placeholder="Search location..." 
+                               class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-red-500">
+                    </div>
+
+                    <!-- Date From -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Date From</label>
+                        <input type="date" name="date_from" value="{{ filters.date_from }}" 
+                               class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-red-500">
+                    </div>
+
+                    <!-- Date To -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Date To</label>
+                        <input type="date" name="date_to" value="{{ filters.date_to }}" 
+                               class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-red-500">
+                    </div>
+
+                    <!-- Shift Filter -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Shift</label>
+                        <select name="shift" class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-green-500">
+                            <option value="">All Shifts</option>
+                            <option value="day" {% if filters.shift == 'day' %}selected{% endif %}>Day Shift</option>
+                            <option value="night" {% if filters.shift == 'night' %}selected{% endif %}>Night Shift</option>
+                        </select>
+                    </div>
+
+                    <!-- Status Filter -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Status</label>
+                        <select name="status" class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-yellow-500">
+                            <option value="">All Statuses</option>
+                            <option value="present" {% if filters.status == 'present' %}selected{% endif %}>Present</option>
+                            <option value="absent" {% if filters.status == 'absent' %}selected{% endif %}>Absent</option>
+                            <option value="off" {% if filters.status == 'off' %}selected{% endif %}>Off</option>
+                            <option value="leave" {% if filters.status == 'leave' %}selected{% endif %}>Leave</option>
+                        </select>
+                    </div>
+
+                    <!-- Guard Search -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Search Guard</label>
+                        <input type="text" id="searchGuard" placeholder="Search guard name..." 
+                               class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-purple-500">
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div class="flex items-end gap-2">
+                        <button type="submit" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition font-medium">
+                            🔍 Apply
+                        </button>
+                        <a href="{{ url_for('view_attendance') }}" class="px-4 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded-lg transition font-medium">
+                            🗑️ Clear
+                        </a>
+                    </div>
                 </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Filter by Shift</label>
-                    <select id="filterShift" class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-green-500 focus:border-green-500">
-                        <option value="">All Shifts</option>
-                        <option value="day">Day Shift</option>
-                        <option value="night">Night Shift</option>
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Filter by Status</label>
-                    <select id="filterStatus" class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500">
-                        <option value="">All Statuses</option>
-                        <option value="present">Present</option>
-                        <option value="absent">Absent</option>
-                        <option value="off">Off</option>
-                        <option value="leave">Leave</option>
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Search Guard</label>
-                    <input type="text" id="searchGuard" placeholder="Search guard name..." class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
-                </div>
+            </form>
+
+            <!-- Results Summary -->
+            {% if filters.company or filters.location or filters.date_from or filters.date_to or filters.shift or filters.status %}
+            <div class="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <p class="text-sm text-blue-800">
+                    <strong>Showing filtered results:</strong> {{ attendance_records|length }} records found
+                    {% if filters.company %} | Company: <span class="font-semibold">{{ filters.company }}</span>{% endif %}
+                    {% if filters.location %} | Location: <span class="font-semibold">{{ filters.location }}</span>{% endif %}
+                    {% if filters.date_from or filters.date_to %}
+                        | Date Range: 
+                        {% if filters.date_from %}<span class="font-semibold">{{ filters.date_from }}</span>{% endif %}
+                        {% if filters.date_from and filters.date_to %}to{% endif %}
+                        {% if filters.date_to %}<span class="font-semibold">{{ filters.date_to }}</span>{% endif %}
+                    {% endif %}
+                    {% if filters.shift %} | Shift: <span class="font-semibold">{{ filters.shift|title }}</span>{% endif %}
+                    {% if filters.status %} | Status: <span class="font-semibold">{{ filters.status|title }}</span>{% endif %}
+                </p>
             </div>
-            <div class="mt-4 flex gap-2">
-                <button onclick="applyFilters()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition font-medium">
-                    🔍 Apply Filters
-                </button>
-                <button onclick="clearFilters()" class="px-4 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded-lg transition font-medium">
-                    🗑️ Clear Filters
-                </button>
+            {% endif %}
+
+            <!-- Quick Export Button -->
+            <div class="mt-4">
                 <button onclick="exportData()" class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition font-medium">
                     📊 Export Data
                 </button>
@@ -80,7 +160,7 @@
             </div>
         </div>
 
-        <!-- Attendance Table -->
+        <!-- Attendance Table (UNCHANGED) -->
         <div class="bg-white shadow-lg rounded-2xl overflow-hidden">
             <div class="p-6">
                 <h3 class="text-xl font-bold text-gray-800 mb-4">📋 Attendance Records</h3>
@@ -201,107 +281,27 @@
         from { opacity: 0; transform: translateY(10px); }
         to { opacity: 1; transform: translateY(0); }
     }
-    
-    .table-container {
-        max-height: 600px;
-        overflow-y: auto;
-    }
-    
-    .sticky-header th {
-        position: sticky;
-        top: 0;
-        background: #f9fafb;
-        z-index: 10;
-    }
 </style>
 
 <script>
     let allRows = [];
     
     document.addEventListener('DOMContentLoaded', function() {
-        // Store all table rows for filtering
         allRows = Array.from(document.querySelectorAll('.attendance-row'));
-        
-        // Calculate initial statistics
         updateStatistics();
-        
-        // Setup real-time search
-        document.getElementById('searchGuard').addEventListener('input', applyFilters);
+        document.getElementById('searchGuard').addEventListener('input', filterByGuardName);
     });
     
-    function applyFilters() {
-        const filterDate = document.getElementById('filterDate').value;
-        const filterShift = document.getElementById('filterShift').value;
-        const filterStatus = document.getElementById('filterStatus').value;
+    function filterByGuardName() {
         const searchGuard = document.getElementById('searchGuard').value.toLowerCase();
-        
-        let visibleCount = 0;
-        
         allRows.forEach(row => {
-            let shouldShow = true;
-            
-            // Date filter
-            if (filterDate && row.dataset.date !== filterDate) {
-                shouldShow = false;
-            }
-            
-            // Shift filter
-            if (filterShift && row.dataset.shift !== filterShift) {
-                shouldShow = false;
-            }
-            
-            // Status filter
-            if (filterStatus && row.dataset.status !== filterStatus) {
-                shouldShow = false;
-            }
-            
-            // Guard name search
             if (searchGuard && !row.dataset.guard.includes(searchGuard)) {
-                shouldShow = false;
-            }
-            
-            if (shouldShow) {
-                row.classList.remove('hidden');
-                visibleCount++;
-            } else {
                 row.classList.add('hidden');
+            } else {
+                row.classList.remove('hidden');
             }
         });
-        
-        // Update statistics for visible rows
         updateStatistics();
-        
-        // Show message if no results
-        const noResultsMessage = document.getElementById('noResultsMessage');
-        if (visibleCount === 0 && !noResultsMessage) {
-            const tbody = document.getElementById('attendanceTableBody');
-            const messageRow = document.createElement('tr');
-            messageRow.id = 'noResultsMessage';
-            messageRow.innerHTML = `
-                <td colspan="9" class="px-6 py-12 text-center">
-                    <div class="text-4xl mb-2">🔍</div>
-                    <p class="text-gray-500">No records match your filters</p>
-                </td>
-            `;
-            tbody.appendChild(messageRow);
-        } else if (visibleCount > 0 && noResultsMessage) {
-            noResultsMessage.remove();
-        }
-    }
-    
-    function clearFilters() {
-        document.getElementById('filterDate').value = '';
-        document.getElementById('filterShift').value = '';
-        document.getElementById('filterStatus').value = '';
-        document.getElementById('searchGuard').value = '';
-        
-        allRows.forEach(row => row.classList.remove('hidden'));
-        updateStatistics();
-        
-        const noResultsMessage = document.getElementById('noResultsMessage');
-        if (noResultsMessage) {
-            noResultsMessage.remove();
-        }
     }
     
     function updateStatistics() {
@@ -330,28 +330,17 @@
             return;
         }
         
-        // Prepare CSV data
         const headers = ['Date', 'Guard Name', 'Location', 'Company', 'Shift', 'Status', 'Marked By', 'Time', 'Notes'];
-        let csvContent = headers.join(',') + '\\n';
+        let csvContent = headers.join(',') + '\n';
         
         visibleRows.forEach(row => {
             const cells = Array.from(row.querySelectorAll('td')).map(cell => {
-                // Clean up cell content for CSV
-                let text = cell.textContent.trim();
-                // Remove extra whitespace and newlines
-                text = text.replace(/\\s+/g, ' ');
-                // Escape quotes
-                text = text.replace(/"/g, '""');
-                // Wrap in quotes if contains comma
-                if (text.includes(',')) {
-                    text = `"${text}"`;
-                }
-                return text;
+                let text = cell.textContent.trim().replace(/\s+/g, ' ').replace(/"/g, '""');
+                return text.includes(',') ? `"${text}"` : text;
             });
-            csvContent += cells.join(',') + '\\n';
+            csvContent += cells.join(',') + '\n';
         });
         
-        // Create download link
         const blob = new Blob([csvContent], { type: 'text/csv' });
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -362,28 +351,7 @@
         document.body.removeChild(a);
         window.URL.revokeObjectURL(url);
         
-        // Show success message
-        showToast('Data exported successfully!', 'success');
-    }
-    
-    function showToast(message, type) {
-        const toast = document.createElement('div');
-        toast.className = `fixed top-4 right-4 px-4 py-3 rounded-lg shadow-lg text-white font-medium fade-in z-50 ${
-            type === 'success' ? 'bg-green-600' : 
-            type === 'error' ? 'bg-red-600' : 
-            'bg-yellow-600'
-        }`;
-        
-        const icon = type === 'success' ? '✅' : type === 'error' ? '❌' : '⚠️';
-        toast.innerHTML = `${icon} ${message}`;
-        
-        document.body.appendChild(toast);
-        
-        setTimeout(() => {
-            toast.style.opacity = '0';
-            toast.style.transform = 'translateX(100%)';
-            setTimeout(() => document.body.removeChild(toast), 300);
-        }, 3000);
+        alert('✅ Data exported successfully!');
     }
 </script>
 {% endblock %}

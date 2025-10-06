@@ -6,6 +6,7 @@ from sqlalchemy import func
 from reports import ReportGenerator
 from flask import make_response
 from flask_migrate import Migrate
+from flask_bcrypt import Bcrypt
 
 
 
@@ -45,8 +46,11 @@ class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
     password = db.Column(db.String(200), nullable=False)
-    role = db.Column(db.String(100), nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    role = db.Column(db.String(50), nullable=False, default='Employee')
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(UTC))
+
+    def __repr__(self):
+        return f"User('{self.username}', '{self.role}')"
 
 class Company(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -66,6 +70,9 @@ class Guard(db.Model):
     location_id = db.Column(db.Integer, db.ForeignKey('location.id'), nullable=False)
     shift_type = db.Column(db.String(10), nullable=False)  # 'day' or 'night'
     role = db.Column(db.String(20), default='guard')  # 'guard', 'supervisor', 'driver'
+    is_active = db.Column(db.Boolean, default=True)  # NEW FIELD
+    resigned_date = db.Column(db.Date, nullable=True)  # NEW FIELD - when guard left
+    notes = db.Column(db.Text, nullable=True)  # NEW FIELD - admin notes about guard
 
 class Attendance(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -458,13 +465,14 @@ def init_database():
         
         # Create users
         users_data = [
-            {"username": "supervisor", "password": "1234", "role": "Supervisor"},
-            {"username": "ops", "password": "1234", "role": "Ops Manager"},
-            {"username": "hr", "password": "1234", "role": "HR Officer"},
-            {"username": "finance", "password": "1234", "role": "Finance"},
-            {"username": "training", "password": "1234", "role": "Training Officer"},
-            {"username": "bso", "password": "1234", "role": "Business Support Officer"},
-            {"username": "gm", "password": "1234", "role": "General Manager"}
+            {"username": "admin", "password": "admin2025", "role": "Administrator"},
+            {"username": "supervisor", "password": "sup2025", "role": "Supervisor"},
+            {"username": "ops", "password": "ops2025", "role": "Ops Manager"},
+            {"username": "hr", "password": "hr2025", "role": "HR Officer"},
+            {"username": "finance", "password": "fin2025", "role": "Finance"},
+            {"username": "training", "password": "t2025", "role": "Training Officer"},
+            {"username": "bso", "password": "bso2025", "role": "Business Support Officer"},
+            {"username": "gm", "password": "gm2025", "role": "General Manager"}
         ]
         
         for user_data in users_data:
@@ -490,7 +498,7 @@ def init_database():
         # Create locations
         locations_data = [
             # TAYSEC Locations
-            {'name': 'Alema Court', 'company_id': taysec.id, 'is_accessible': True},
+            {'name': 'Alema Court', 'company_id': taysec.id, 'is_accessible': False},
             {'name': 'Cedar Court', 'company_id': taysec.id, 'is_accessible': True},
             {'name': 'Enterprise Gardens', 'company_id': taysec.id, 'is_accessible': True},
             {'name': 'Hansen Court', 'company_id': taysec.id, 'is_accessible': True},
@@ -746,6 +754,34 @@ def dashboard():
     role = session.get('role')
     return render_template('dashboard.html', role=role)
 
+@app.route('/admin')
+def admin_dashboard():
+    """Admin-only dashboard for system management"""
+    if 'username' not in session:
+        return redirect(url_for('login'))
+    
+    # Only Administrator role can access
+    if session.get('role') != 'Administrator':
+        flash('Access denied - Administrator privileges required', 'error')
+        return redirect(url_for('dashboard'))
+    
+    # Get system statistics
+    total_guards = Guard.query.count()
+    active_guards = Guard.query.filter_by(is_active=True).count() if hasattr(Guard, 'is_active') else total_guards
+    total_locations = Location.query.count()
+    active_locations = Location.query.filter_by(is_accessible=True).count()
+    total_users = User.query.count()
+    
+    stats = {
+        'total_guards': total_guards,
+        'active_guards': active_guards,
+        'total_locations': total_locations,
+        'active_locations': active_locations,
+        'total_users': total_users
+    }
+    
+    return render_template('admin_dashboard.html', stats=stats)
+
 # ============================================================================
 # REQUEST MANAGEMENT ROUTES
 # ============================================================================
@@ -832,6 +868,284 @@ def check_write_access():
     return None  # None means access is granted
 
 # ============================================================================
+# ADMIN API ROUTES (Add these to your app.py after line ~850)
+# ============================================================================
+
+@app.route('/api/admin/guards')
+def admin_get_guards():
+    """Get all guards for admin management"""
+    if 'username' not in session or session.get('role') != 'Administrator':
+        return jsonify({'error': 'Access denied'}), 403
+    
+    guards = Guard.query.join(Location).join(Company).all()
+    result = []
+    
+    for guard in guards:
+        result.append({
+            'id': guard.id,
+            'name': guard.name,
+            'location_id': guard.location_id,
+            'location_name': guard.location.name,
+            'company_name': guard.location.company.name,
+            'shift_type': guard.shift_type,
+            'role': guard.role,
+            'is_active': guard.is_active if hasattr(guard, 'is_active') else True,
+            'resigned_date': guard.resigned_date.strftime('%Y-%m-%d') if hasattr(guard, 'resigned_date') and guard.resigned_date else None,
+            'notes': guard.notes if hasattr(guard, 'notes') else ''
+        })
+    
+    return jsonify(result)
+
+@app.route('/api/admin/guards', methods=['POST'])
+def admin_add_guard():
+    """Add a new guard"""
+    if 'username' not in session or session.get('role') != 'Administrator':
+        return jsonify({'error': 'Access denied'}), 403
+    
+    data = request.get_json()
+    
+    # Validate required fields
+    if not all(k in data for k in ['name', 'location_id', 'shift_type']):
+        return jsonify({'error': 'Missing required fields'}), 400
+    
+    try:
+        new_guard = Guard(
+            name=data['name'],
+            location_id=data['location_id'],
+            shift_type=data['shift_type'],
+            role=data.get('role', 'guard'),
+            is_active=True
+        )
+        
+        db.session.add(new_guard)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True, 
+            'message': f"Guard {data['name']} added successfully",
+            'guard_id': new_guard.id
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': f'Failed to add guard: {str(e)}'}), 500
+
+@app.route('/api/admin/guards/<int:guard_id>', methods=['PUT'])
+def admin_update_guard(guard_id):
+    """Update guard details"""
+    if 'username' not in session or session.get('role') != 'Administrator':
+        return jsonify({'error': 'Access denied'}), 403
+    
+    guard = Guard.query.get_or_404(guard_id)
+    data = request.get_json()
+    
+    try:
+        if 'name' in data:
+            guard.name = data['name']
+        if 'location_id' in data:
+            guard.location_id = data['location_id']
+        if 'shift_type' in data:
+            guard.shift_type = data['shift_type']
+        if 'role' in data:
+            guard.role = data['role']
+        if 'notes' in data and hasattr(guard, 'notes'):
+            guard.notes = data['notes']
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': f"Guard {guard.name} updated successfully"
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': f'Failed to update guard: {str(e)}'}), 500
+
+@app.route('/api/admin/guards/<int:guard_id>/deactivate', methods=['POST'])
+def admin_deactivate_guard(guard_id):
+    """Deactivate a guard (soft delete)"""
+    if 'username' not in session or session.get('role') != 'Administrator':
+        return jsonify({'error': 'Access denied'}), 403
+    
+    guard = Guard.query.get_or_404(guard_id)
+    data = request.get_json()
+    
+    try:
+        if hasattr(guard, 'is_active'):
+            guard.is_active = False
+        if hasattr(guard, 'resigned_date'):
+            guard.resigned_date = datetime.strptime(data.get('resigned_date', date.today().isoformat()), '%Y-%m-%d').date()
+        if hasattr(guard, 'notes') and data.get('reason'):
+            guard.notes = f"Deactivated: {data['reason']}"
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': f"Guard {guard.name} deactivated successfully"
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': f'Failed to deactivate guard: {str(e)}'}), 500
+
+@app.route('/api/admin/guards/<int:guard_id>/reactivate', methods=['POST'])
+def admin_reactivate_guard(guard_id):
+    """Reactivate a deactivated guard"""
+    if 'username' not in session or session.get('role') != 'Administrator':
+        return jsonify({'error': 'Access denied'}), 403
+    
+    guard = Guard.query.get_or_404(guard_id)
+    
+    try:
+        if hasattr(guard, 'is_active'):
+            guard.is_active = True
+        if hasattr(guard, 'resigned_date'):
+            guard.resigned_date = None
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': f"Guard {guard.name} reactivated successfully"
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': f'Failed to reactivate guard: {str(e)}'}), 500
+
+# ============================================================================
+# LOCATION MANAGEMENT API ROUTES
+# ============================================================================
+
+@app.route('/api/admin/locations')
+def admin_get_locations():
+    """Get all locations for admin management"""
+    if 'username' not in session or session.get('role') != 'Administrator':
+        return jsonify({'error': 'Access denied'}), 403
+    
+    locations = Location.query.join(Company).all()
+    result = []
+    
+    for location in locations:
+        guard_count = Guard.query.filter_by(location_id=location.id).count()
+        active_guard_count = Guard.query.filter_by(location_id=location.id, is_active=True).count() if hasattr(Guard, 'is_active') else guard_count
+        
+        result.append({
+            'id': location.id,
+            'name': location.name,
+            'company_id': location.company_id,
+            'company_name': location.company.name,
+            'is_accessible': location.is_accessible,
+            'guard_count': guard_count,
+            'active_guard_count': active_guard_count
+        })
+    
+    return jsonify(result)
+
+@app.route('/api/admin/locations', methods=['POST'])
+def admin_add_location():
+    """Add a new location"""
+    if 'username' not in session or session.get('role') != 'Administrator':
+        return jsonify({'error': 'Access denied'}), 403
+    
+    data = request.get_json()
+    
+    if not all(k in data for k in ['name', 'company_id']):
+        return jsonify({'error': 'Missing required fields'}), 400
+    
+    try:
+        new_location = Location(
+            name=data['name'],
+            company_id=data['company_id'],
+            is_accessible=data.get('is_accessible', True)
+        )
+        
+        db.session.add(new_location)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': f"Location {data['name']} added successfully",
+            'location_id': new_location.id
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': f'Failed to add location: {str(e)}'}), 500
+
+@app.route('/api/admin/locations/<int:location_id>', methods=['PUT'])
+def admin_update_location(location_id):
+    """Update location details"""
+    if 'username' not in session or session.get('role') != 'Administrator':
+        return jsonify({'error': 'Access denied'}), 403
+    
+    location = Location.query.get_or_404(location_id)
+    data = request.get_json()
+    
+    try:
+        if 'name' in data:
+            location.name = data['name']
+        if 'company_id' in data:
+            location.company_id = data['company_id']
+        if 'is_accessible' in data:
+            location.is_accessible = data['is_accessible']
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': f"Location {location.name} updated successfully"
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': f'Failed to update location: {str(e)}'}), 500
+
+@app.route('/api/admin/locations/<int:location_id>/toggle', methods=['POST'])
+def admin_toggle_location(location_id):
+    """Toggle location accessibility (soft delete/reactivate)"""
+    if 'username' not in session or session.get('role') != 'Administrator':
+        return jsonify({'error': 'Access denied'}), 403
+    
+    location = Location.query.get_or_404(location_id)
+    
+    try:
+        location.is_accessible = not location.is_accessible
+        db.session.commit()
+        
+        status = "activated" if location.is_accessible else "deactivated"
+        return jsonify({
+            'success': True,
+            'message': f"Location {location.name} {status} successfully",
+            'is_accessible': location.is_accessible
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': f'Failed to toggle location: {str(e)}'}), 500
+
+# ============================================================================
+# COMPANY MANAGEMENT API ROUTES
+# ============================================================================
+
+@app.route('/api/admin/companies')
+def admin_get_companies():
+    """Get all companies"""
+    if 'username' not in session or session.get('role') != 'Administrator':
+        return jsonify({'error': 'Access denied'}), 403
+    
+    companies = Company.query.all()
+    result = []
+    
+    for company in companies:
+        location_count = Location.query.filter_by(company_id=company.id).count()
+        active_location_count = Location.query.filter_by(company_id=company.id, is_accessible=True).count()
+        
+        result.append({
+            'id': company.id,
+            'name': company.name,
+            'location_count': location_count,
+            'active_location_count': active_location_count
+        })
+    
+    return jsonify(result)
+
+# ============================================================================
 # ATTENDANCE ROUTES
 # ============================================================================
 
@@ -849,13 +1163,24 @@ def attendance():
     # If authorized, render the attendance template
     return render_template('attendance.html')
 
+# Enhanced view_attendance route with filtering
+# REPLACE your existing @app.route('/view_attendance') function with this:
+
 @app.route('/view_attendance')
 def view_attendance():
     if 'username' not in session:
         return redirect(url_for('login'))
     
-    # Simplified query - get all attendance records with guard/location/company info
-    attendance_records = db.session.query(
+    # Get filter parameters
+    company_filter = request.args.get('company', '')
+    location_filter = request.args.get('location', '')
+    date_from = request.args.get('date_from', '')
+    date_to = request.args.get('date_to', '')
+    shift_filter = request.args.get('shift', '')
+    status_filter = request.args.get('status', '')
+    
+    # Base query
+    query = db.session.query(
         Attendance, Guard, Location, Company
     ).join(
         Guard, Attendance.guard_id == Guard.id
@@ -863,9 +1188,34 @@ def view_attendance():
         Location, Guard.location_id == Location.id
     ).join(
         Company, Location.company_id == Company.id
-    ).order_by(Attendance.date.desc(), Attendance.timestamp.desc()).all()
+    )
     
-    # Get the most recent comment for each guard (simpler approach)
+    # Apply filters
+    if company_filter:
+        query = query.filter(Company.name == company_filter)
+    
+    if location_filter:
+        query = query.filter(Location.name.ilike(f'%{location_filter}%'))
+    
+    if date_from:
+        query = query.filter(Attendance.date >= datetime.strptime(date_from, '%Y-%m-%d').date())
+    
+    if date_to:
+        query = query.filter(Attendance.date <= datetime.strptime(date_to, '%Y-%m-%d').date())
+    
+    if shift_filter:
+        query = query.filter(Attendance.shift == shift_filter)
+    
+    if status_filter:
+        query = query.filter(Attendance.status == status_filter)
+    
+    # Execute query with ordering
+    attendance_records = query.order_by(
+        Attendance.date.desc(), 
+        Attendance.timestamp.desc()
+    ).all()
+    
+    # Get latest comments for each guard
     for attendance, guard, location, company in attendance_records:
         latest_comment = GuardComment.query.filter_by(
             guard_id=guard.id,
@@ -874,8 +1224,24 @@ def view_attendance():
         
         if latest_comment:
             attendance.notes = latest_comment.comment
-
-    return render_template('view_attendance.html', attendance_records=attendance_records)# ============================================================================
+    
+    # Get all companies for filter dropdown
+    companies = Company.query.all()
+    
+    return render_template(
+        'view_attendance.html', 
+        attendance_records=attendance_records,
+        companies=companies,
+        filters={
+            'company': company_filter,
+            'location': location_filter,
+            'date_from': date_from,
+            'date_to': date_to,
+            'shift': shift_filter,
+            'status': status_filter
+        }
+    )
+# ============================================================================
 # API ROUTES FOR ATTENDANCE
 # ============================================================================
 
@@ -1068,7 +1434,7 @@ def mark_attendance():
                 status=status,
                 shift=shift,
                 notes=notes,
-                marked_by=session['username']
+                marked_by=session['role']
             )
             db.session.add(attendance)
             message = f"Attendance recorded for {guard.name}."
@@ -1472,7 +1838,7 @@ def reports_page():
         return redirect(url_for('login'))
     
     # Only certain roles can access reports
-    allowed_roles = ['Ops Manager', 'HR Officer', 'Finance', 'General Manager']
+    allowed_roles = ['Ops Manager', 'Administrator', 'Business Support Officer', 'HR Officer', 'Finance', 'General Manager']
     if session.get('role') not in allowed_roles:
         flash('Access denied - insufficient permissions', 'error')
         return redirect(url_for('dashboard'))
@@ -1595,10 +1961,60 @@ def delete_request(request_id):
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': 'Failed to delete request', 'details': str(e)}), 500
+
+@app.route('/admin/migrate-database')
+def migrate_database():
+    """One-time migration to add new fields"""
+    if 'username' not in session or session.get('role') != 'Administrator':
+        return "Access denied"
+    
+    try:
+        # Add new columns if they don't exist
+        with db.engine.connect() as conn:
+            conn.execute(db.text("ALTER TABLE guard ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE"))
+            conn.execute(db.text("ALTER TABLE guard ADD COLUMN IF NOT EXISTS resigned_date DATE"))
+            conn.execute(db.text("ALTER TABLE guard ADD COLUMN IF NOT EXISTS notes TEXT"))
+            conn.commit()
+        
+        return "Database migrated successfully! You can now use the admin features."
+    except Exception as e:
+        return f"Migration error: {str(e)}"
     
 # ============================================================================
 # APPLICATION STARTUP
 # ============================================================================
+
+# Function to initialize database (for running migrations/setup)
+def create_db_tables():
+    """Initializes all database tables and seeds initial users if the database is empty."""
+    with app.app_context():
+        # 1. Create all tables
+        db.create_all()
+        print("Database tables created successfully.")
+        
+        # 2. Seed initial users if none exist
+        if User.query.first() is None:
+            print("Seeding initial users...")
+            login_info = [] # List to display login info (without sensitive passwords)
+
+            for user_data in initial_users_data:
+                # CRITICAL: Hash the password using bcrypt for security
+                hashed_password = bcrypt.generate_password_hash(user_data["password"]).decode('utf-8')
+                
+                new_user = User(
+                    username=user_data["username"],
+                    password=hashed_password,
+                    role=user_data["role"]
+                    # email is optional, leaving it out for now
+                )
+                db.session.add(new_user)
+                login_info.append(f"{user_data['username']}/<password_hidden>")
+            
+            db.session.commit()
+            print(f"👥 Users created for all roles: {', '.join(login_info)}")
+        else:
+            print("Users already exist. Skipping initial seeding.")
+
 
 if __name__ == '__main__':
     init_database()
