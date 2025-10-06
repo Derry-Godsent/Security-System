@@ -459,9 +459,8 @@ def init_database():
         db.create_all()
         print("Database tables created successfully.")
         
-        # Check if data already exists
-        if User.query.first():
-            return
+        user.query.delete()
+        db.session.commit()
         
         # Create users
         users_data = [
@@ -478,6 +477,9 @@ def init_database():
         for user_data in users_data:
             user = User(**user_data)
             db.session.add(user)
+
+        db.session.commit()
+        print("User accounts reset successfully.")
         
         # Create companies
         companies = [
