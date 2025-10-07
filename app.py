@@ -71,7 +71,8 @@ DEFAULT_USERS = [
     ("hr", "hr2025", "HR Officer"),
     ("finance", "fin2025", "Finance"),
     ("bso", "bso2025", "Business Support Officer"),
-    ("gm", "gm2025", "General Manager")
+    ("gm", "gm2025", "General Manager"),
+    ("training", "t2025", "Training Officer")
 ]
 
 # ============================================================================
@@ -337,10 +338,23 @@ def init_database():
         db.create_all()
         print("✅ Database tables created successfully.")
         
-        # Check if data already exists
-        if User.query.first():
-            print("ℹ️ Database already initialized.")
-            return
+         # If users exist, update their passwords instead of skipping
+        existing_users = User.query.all()
+        if existing_users:
+            print("🔁 Updating existing user passwords...")
+            for username, password, role in DEFAULT_USERS:
+                user = User.query.filter_by(username=username).first()
+                if user:
+                    user.set_password(password, bcrypt)
+                    user.role = role  # update role too, just in case
+                else:
+                    new_user = User(username=username, role=role)
+                    new_user.set_password(password, bcrypt)
+                    db.session.add(new_user)
+            db.session.commit()
+            print("✅ User passwords updated successfully.")
+            return  # Exit after updating users
+
         
         print("📝 Seeding initial data...")
         
