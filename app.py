@@ -1,276 +1,102 @@
-from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify
-from flask_sqlalchemy import SQLAlchemy
+from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify, make_response
+from flask_migrate import Migrate
+from flask_bcrypt import Bcrypt
+from flask_login import LoginManager
 from datetime import datetime, date, timedelta, UTC
 import os
 import logging
-import base64
-from sqlalchemy import func
-from reports import ReportGenerator
-from flask import make_response
-from flask_migrate import Migrate
-from flask_bcrypt import Bcrypt
-from urllib.parse import urlparse
-from flask_login import (
-    LoginManager, UserMixin, login_user, logout_user, current_user, login_required
+
+# Import db and all models from models.py
+from models import (
+    db, User, Company, Location, Guard, Attendance, DeletedAttendance,
+    GuardComment, ShiftOverride, PayrollTracking, NotificationSettings,
+    Notification, AttendanceDeadline, Request
 )
-from flask_bcrypt import Bcrypt
-from sqlalchemy import text, event
-from sqlalchemy.engine import Engine
-from sqlalchemy.orm import relationship
 
+# Import reports
+from reports import ReportGenerator
 
-# Set up logging for Firebase diagnostics
+# Set up logging
 logging.basicConfig(level=logging.INFO)
 
-# --- Library Imports ---
-from flask import (
-    Flask, render_template, request, session, redirect, url_for, flash, jsonify
-)
+# ============================================================================
+# APP CONFIGURATION
+# ============================================================================
 
-# --- Global Configuration ---
-# Set up default configuration from environment variables or sensible defaults
+app = Flask(__name__)
+
+# Database configuration
 basedir = os.path.abspath(os.path.dirname(__file__))
 
-# Fetch global variables provided by the Canvas environment
-app_id = os.environ.get('CANVAS_APP_ID', 'security-system-default')
-
-# Database URL configuration (use environment variable for Render/Neon)
+# --- DATABASE CONFIGURATION (Production Ready) ---
 DATABASE_URL = os.environ.get('DATABASE_URL')
+
 if DATABASE_URL is None:
-    # Default to SQLite for local development if DB_URL is not set
+    # Use local SQLite for genuine local testing
     SQLALCHEMY_DATABASE_URI = 'sqlite:///' + os.path.join(basedir, 'app.db')
 else:
-    # Convert 'postgres' scheme to 'postgresql' required by SQLAlchemy
+    # Use PostgreSQL on deployment. Replaces 'postgres://' with 'postgresql://' for SQLAlchemy compatibility.
     if DATABASE_URL.startswith("postgres://"):
         DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
     SQLALCHEMY_DATABASE_URI = DATABASE_URL
 
-
-# Role-based access control constants
-ATTENDANCE_WRITE_ROLES = ['Supervisor', 
-'Business Support Officer']
-
-app = Flask(__name__)
-
-# SECURITY FIX: Use environment variable for the Secret Key
-app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'some-fallback-for-local-dev-only')
-
-# FUNCTIONAL FIX: Add SQLite fallback for local development
-app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get("DATABASE_URL", "sqlite:///site.db")
-
+# Flask config
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
+app.config['SQLALCHEMY_DATABASE_URI'] = SQLALCHEMY_DATABASE_URI
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-db = SQLAlchemy(app)
-
+# Initialize extensions
+db.init_app(app)
 migrate = Migrate(app, db)
-
 bcrypt = Bcrypt(app)
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
 login_manager.login_message_category = 'info'
+
+# ============================================================================
+# CONSTANTS
+# ============================================================================
+
+ATTENDANCE_WRITE_ROLES = ['Supervisor', 'Business Support Officer']
+
+REPORTING_ROLES = [
+    'Ops Manager', 'HR Officer', 'Finance', 'General Manager',
+    'Business Support Officer', 'Administrator'
+]
+
+DEFAULT_USERS = [
+    ("admin", "admin2025", "Administrator"),
+    ("supervisor", "sup2025", "Supervisor"),
+    ("ops", "ops2025", "Ops Manager"),
+    ("hr", "hr2025", "HR Officer"),
+    ("finance", "fin2025", "Finance"),
+    ("bso", "bso2025", "Business Support Officer"),
+    ("gm", "gm2025", "General Manager")
+]
+
+# ============================================================================
+# FLASK-LOGIN USER LOADER
+# ============================================================================
 
 @login_manager.user_loader
 def load_user(user_id):
     """Callback for loading a user from the database given their ID."""
     return User.query.get(int(user_id))
 
-# The list of roles authorized to view management reports
-REPORTING_ROLES = [
-    'Ops Manager',
-    'HR Officer',
-    'Finance',
-    'General Manager',
-    'Business Support Officer' # Added BSO here
-]
-
 # ============================================================================
-# DATABASE MODELS
+# HELPER FUNCTIONS
 # ============================================================================
 
-class User(db.Model, UserMixin):
-    id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(80), unique=True, nullable=False)
-    password = db.Column(db.String(200), nullable=False)
-    role = db.Column(db.String(50), nullable=False, default='Employee')
-    created_at = db.Column(db.DateTime, default=lambda: datetime.now(UTC))
+def check_write_access():
+    """Check if user has write access for attendance operations"""
+    if 'username' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+    
+    if session.get('role') not in ATTENDANCE_WRITE_ROLES:
+        return jsonify({'error': 'Access denied - insufficient permissions'}), 403
+    
+    return None  # None means access is granted
 
-    def set_password(self, password):
-        """Hashes and sets the password."""
-        self.password_hash = bcrypt.generate_password_hash(password).decode('utf-8')
-
-    def check_password(self, password):
-        """Checks the provided password against the stored hash."""
-        return bcrypt.check_password_hash(self.password_hash, password)
-
-    def __repr__(self):
-        return f"User('{self.username}', '{self.role}')"
-
-class Company(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(50), nullable=False)
-    locations = db.relationship('Location', backref='company', lazy=True)
-
-class Location(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100), nullable=False)
-    company_id = db.Column(db.Integer, db.ForeignKey('company.id'), nullable=False)
-    is_accessible = db.Column(db.Boolean, default=True)
-    guards = db.relationship('Guard', backref='location', lazy=True)
-
-class Guard(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100), nullable=False)
-    location_id = db.Column(db.Integer, db.ForeignKey('location.id'), nullable=False)
-    shift_type = db.Column(db.String(10), nullable=False)  # 'day' or 'night'
-    role = db.Column(db.String(20), default='guard')  # 'guard', 'supervisor', 'driver'
-    is_active = db.Column(db.Boolean, default=True)  # NEW FIELD
-    resigned_date = db.Column(db.Date, nullable=True)  # NEW FIELD - when guard left
-    notes = db.Column(db.Text, nullable=True)  # NEW FIELD - admin notes about guard
-
-class Attendance(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    guard_id = db.Column(db.Integer, db.ForeignKey('guard.id'), nullable=False)
-    date = db.Column(db.Date, default=date.today)
-    shift = db.Column(db.String(10), nullable=False)
-    status = db.Column(db.String(20))  # 'present', 'absent', 'off', 'leave'
-    notes = db.Column(db.Text)
-    marked_by = db.Column(db.String(50))  # supervisor username
-    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
-    
-class GuardComment(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    guard_id = db.Column(db.Integer, db.ForeignKey('guard.id'), nullable=False)
-    comment = db.Column(db.Text, nullable=False)
-    comment_type = db.Column(db.String(50), default='note')  # 'note', 'relocation', 'issue', 'movement'
-    created_by = db.Column(db.String(50), nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    is_active = db.Column(db.Boolean, default=True)
-    
-    # Relationship
-    guard = db.relationship('Guard', backref='comments')
-
-class ShiftOverride(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    guard_id = db.Column(db.Integer, db.ForeignKey('guard.id'), nullable=False)
-    original_shift = db.Column(db.String(10), nullable=False)  # guard's default shift
-    override_shift = db.Column(db.String(10), nullable=False)  # what they're working today
-    original_location_id = db.Column(db.Integer, db.ForeignKey('location.id'))  # their default location
-    override_location_id = db.Column(db.Integer, db.ForeignKey('location.id'))  # where they're working today
-    date = db.Column(db.Date, default=date.today)
-    reason = db.Column(db.String(200), nullable=False)
-    created_by = db.Column(db.String(50), nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    is_active = db.Column(db.Boolean, default=True)
-    
-    # Relationships
-    guard = db.relationship('Guard', backref='shift_overrides')
-    original_location = db.relationship('Location', foreign_keys=[original_location_id])
-    override_location = db.relationship('Location', foreign_keys=[override_location_id])
-
-class PayrollTracking(db.Model):
-    """Track all attendance events for payroll calculations"""
-    id = db.Column(db.Integer, primary_key=True)
-    guard_id = db.Column(db.Integer, db.ForeignKey('guard.id'), nullable=False)
-    date = db.Column(db.Date, default=date.today)
-    scheduled_shift = db.Column(db.String(10), nullable=False)  # what they were supposed to work
-    actual_shift = db.Column(db.String(10), nullable=False)     # what they actually worked
-    scheduled_location_id = db.Column(db.Integer, db.ForeignKey('location.id'))
-    actual_location_id = db.Column(db.Integer, db.ForeignKey('location.id'))
-    status = db.Column(db.String(20), nullable=False)  # present, absent, etc.
-    hours_worked = db.Column(db.Float, default=0.0)
-    is_overtime = db.Column(db.Boolean, default=False)
-    is_shift_differential = db.Column(db.Boolean, default=False)  # night shift premium
-    is_location_premium = db.Column(db.Boolean, default=False)   # premium locations
-    base_rate = db.Column(db.Float, default=0.0)
-    total_pay = db.Column(db.Float, default=0.0)
-    created_by = db.Column(db.String(50), nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    
-    # Relationships
-    guard = db.relationship('Guard', backref='payroll_records')
-    scheduled_location = db.relationship('Location', foreign_keys=[scheduled_location_id])
-    actual_location = db.relationship('Location', foreign_keys=[actual_location_id])
-
-class NotificationSettings(db.Model):
-    """User notification preferences"""
-    id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(50), nullable=False, unique=True)
-    role = db.Column(db.String(50), nullable=False)
-    
-    # Time-based notifications (for supervisors)
-    day_shift_reminder_time = db.Column(db.String(5), default='09:00')  # HH:MM format
-    night_shift_reminder_time = db.Column(db.String(5), default='19:00')
-    overdue_reminder_minutes = db.Column(db.Integer, default=30)
-    urgent_reminder_minutes = db.Column(db.Integer, default=120)
-    
-    # Event-based notifications
-    notify_new_requests = db.Column(db.Boolean, default=True)
-    notify_attendance_submitted = db.Column(db.Boolean, default=True)
-    notify_attendance_missing = db.Column(db.Boolean, default=True)
-    notify_guard_issues = db.Column(db.Boolean, default=True)
-    notify_shift_changes = db.Column(db.Boolean, default=True)
-    
-    # Delivery preferences
-    in_app_notifications = db.Column(db.Boolean, default=True)
-    email_notifications = db.Column(db.Boolean, default=False)  # Future feature
-    
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow)
-
-class Notification(db.Model):
-    """Individual notifications"""
-    id = db.Column(db.Integer, primary_key=True)
-    recipient_username = db.Column(db.String(50), nullable=False)
-    recipient_role = db.Column(db.String(50), nullable=False)
-    
-    title = db.Column(db.String(200), nullable=False)
-    message = db.Column(db.Text, nullable=False)
-    notification_type = db.Column(db.String(50), nullable=False)  # 'reminder', 'alert', 'info', 'urgent'
-    category = db.Column(db.String(50), nullable=False)  # 'attendance', 'request', 'guard_issue', 'system'
-    
-    # Optional reference data
-    reference_id = db.Column(db.Integer)  # ID of related record (request_id, guard_id, etc.)
-    reference_type = db.Column(db.String(50))  # 'request', 'guard', 'attendance', etc.
-    
-    # Status
-    is_read = db.Column(db.Boolean, default=False)
-    is_dismissed = db.Column(db.Boolean, default=False)
-    
-    # Scheduling
-    scheduled_for = db.Column(db.DateTime)  # For future delivery
-    delivered_at = db.Column(db.DateTime)
-    
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    expires_at = db.Column(db.DateTime)  # Auto-cleanup old notifications
-
-class AttendanceDeadline(db.Model):
-    """Track attendance submission deadlines"""
-    id = db.Column(db.Integer, primary_key=True)
-    date = db.Column(db.Date, nullable=False)
-    shift = db.Column(db.String(10), nullable=False)  # 'day' or 'night'
-    
-    expected_submission_time = db.Column(db.DateTime, nullable=False)
-    actual_submission_time = db.Column(db.DateTime)
-    
-    is_submitted = db.Column(db.Boolean, default=False)
-    is_overdue = db.Column(db.Boolean, default=False)
-    
-    # Reminder tracking
-    reminder_30min_sent = db.Column(db.Boolean, default=False)
-    reminder_2hour_sent = db.Column(db.Boolean, default=False)
-    
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-
-class Request(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    from_user = db.Column(db.String(50), nullable=False)
-    role = db.Column(db.String(50), nullable=False)
-    type = db.Column(db.String(50), nullable=False)
-    description = db.Column(db.Text, nullable=False)
-    status = db.Column(db.String(20), default='Pending')
-    submitted_at = db.Column(db.DateTime, default=datetime.utcnow)
-    responded_at = db.Column(db.DateTime)
-    updated_by = db.Column(db.String(50))
 
 # ============================================================================
 # NOTIFICATION SERVICE FUNCTIONS
@@ -281,10 +107,9 @@ def create_notification(recipient_username, recipient_role, title, message,
                        reference_id=None, reference_type=None, 
                        scheduled_for=None, expires_in_hours=24):
     """Create a new notification"""
-    
     expires_at = None
     if expires_in_hours:
-        expires_at = datetime.utcnow() + timedelta(hours=expires_in_hours)
+        expires_at = datetime.now(UTC) + timedelta(hours=expires_in_hours)
     
     notification = Notification(
         recipient_username=recipient_username,
@@ -295,7 +120,7 @@ def create_notification(recipient_username, recipient_role, title, message,
         category=category,
         reference_id=reference_id,
         reference_type=reference_type,
-        scheduled_for=scheduled_for or datetime.utcnow(),
+        scheduled_for=scheduled_for or datetime.now(UTC),
         expires_at=expires_at
     )
     
@@ -510,28 +335,22 @@ def init_database():
     """Initialize database with sample data"""
     with app.app_context():
         db.create_all()
-        print("Database tables created successfully.")
+        print("✅ Database tables created successfully.")
         
         # Check if data already exists
         if User.query.first():
+            print("ℹ️ Database already initialized.")
             return
         
-        # Create users
-        users_data = [
-            {"username": "admin", "password": "admin2025", "role": "Administrator"},
-            {"username": "supervisor", "password": "sup2025", "role": "Supervisor"},
-            {"username": "ops", "password": "ops2025", "role": "Ops Manager"},
-            {"username": "hr", "password": "hr2025", "role": "HR Officer"},
-            {"username": "finance", "password": "fin2025", "role": "Finance"},
-            {"username": "training", "password": "t2025", "role": "Training Officer"},
-            {"username": "bso", "password": "bso2025", "role": "Business Support Officer"},
-            {"username": "gm", "password": "gm2025", "role": "General Manager"}
-        ]
+        print("📝 Seeding initial data...")
         
-        for user_data in users_data:
-            user = User(**user_data)
+        # Create users with bcrypt hashed passwords
+        for username, password, role in DEFAULT_USERS:
+            user = User(username=username, role=role)
+            user.set_password(password, bcrypt)  # Pass bcrypt instance
             db.session.add(user)
-        
+
+                
         # Create companies
         companies = [
             Company(name='TAYSEC'),
@@ -548,7 +367,7 @@ def init_database():
         broll = Company.query.filter_by(name='BROLL').first()
         minor = Company.query.filter_by(name='MINOR').first()
         
-        # Create locations
+        # Create locations 
         locations_data = [
             # TAYSEC Locations
             {'name': 'Alema Court', 'company_id': taysec.id, 'is_accessible': False},
@@ -598,20 +417,8 @@ def init_database():
         
         # Create guards (using your provided data)
         create_sample_guards()
-        
-        # Create sample request
-        sample_request = Request(
-            from_user='Supervisor',
-            role='Supervisor',
-            type='Inventory',
-            description='I need a new book for Cantonment',
-            status='Resolved',
-            submitted_at=datetime(2025, 9, 18, 11, 20, 31),
-            responded_at=datetime(2025, 9, 18, 16, 11, 50),
-            updated_by='Ops Manager'
-        )
-        db.session.add(sample_request)
-        db.session.commit()
+
+        print("✅ Initial data seeded successfully!")
 
 def create_sample_guards():
     """Create all guard data"""
@@ -777,9 +584,9 @@ def login():
         username = request.form['username']
         password = request.form['password']
         
-        user = User.query.filter_by(username=username, password=password).first()
+        user = User.query.filter_by(username=username).first()
         
-        if user:
+        if user and user.check_password(password, bcrypt):
             session['username'] = user.username
             session['role'] = user.role
             flash('Login successful!', 'success')
@@ -788,6 +595,7 @@ def login():
             flash('Invalid credentials', 'error')
     
     return render_template('login.html', current_year=datetime.now().year)
+
 
 @app.route('/logout')
 def logout():
@@ -2034,6 +1842,344 @@ def migrate_database():
         return f"Migration error: {str(e)}"
     
 # ============================================================================
+# ATTENDANCE DELETION API ROUTES (Add to app.py after admin routes)
+# ============================================================================
+
+@app.route('/api/admin/attendance/<int:attendance_id>', methods=['DELETE'])
+def admin_delete_attendance(attendance_id):
+    """Soft delete an attendance record (Administrator only)"""
+    if 'username' not in session or session.get('role') != 'Administrator':
+        return jsonify({'error': 'Access denied - Administrator privileges required'}), 403
+    
+    attendance = Attendance.query.get_or_404(attendance_id)
+    data = request.get_json() or {}
+    
+    try:
+        # Create backup in DeletedAttendance table
+        deleted_record = DeletedAttendance(
+            original_attendance_id=attendance.id,
+            guard_id=attendance.guard_id,
+            date=attendance.date,
+            shift=attendance.shift,
+            status=attendance.status,
+            notes=attendance.notes,
+            marked_by=attendance.marked_by,
+            timestamp=attendance.timestamp,
+            deleted_by=session['username'],
+            deletion_reason=data.get('reason', 'No reason provided')
+        )
+        
+        db.session.add(deleted_record)
+        
+        # Delete the original record
+        db.session.delete(attendance)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Attendance record deleted successfully',
+            'deleted_id': deleted_record.id,
+            'can_undo': True
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': f'Failed to delete record: {str(e)}'}), 500
+
+
+@app.route('/api/admin/attendance/undo/<int:deleted_id>', methods=['POST'])
+def admin_undo_delete_attendance(deleted_id):
+    """Restore a deleted attendance record (Administrator only)"""
+    if 'username' not in session or session.get('role') != 'Administrator':
+        return jsonify({'error': 'Access denied - Administrator privileges required'}), 403
+    
+    deleted_record = DeletedAttendance.query.get_or_404(deleted_id)
+    
+    try:
+        # Restore the attendance record
+        restored_attendance = Attendance(
+            guard_id=deleted_record.guard_id,
+            date=deleted_record.date,
+            shift=deleted_record.shift,
+            status=deleted_record.status,
+            notes=deleted_record.notes,
+            marked_by=deleted_record.marked_by,
+            timestamp=deleted_record.timestamp
+        )
+        
+        db.session.add(restored_attendance)
+        
+        # Remove from deleted records
+        db.session.delete(deleted_record)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Attendance record restored successfully',
+            'restored_id': restored_attendance.id
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': f'Failed to restore record: {str(e)}'}), 500
+
+
+@app.route('/api/admin/attendance/deleted')
+def admin_get_deleted_attendance():
+    """Get recently deleted attendance records for undo (Administrator only)"""
+    if 'username' not in session or session.get('role') != 'Administrator':
+        return jsonify({'error': 'Access denied'}), 403
+    
+    # Get records deleted in last 24 hours
+    cutoff_time = datetime.utcnow() - timedelta(hours=24)
+    deleted_records = DeletedAttendance.query.filter(
+        DeletedAttendance.deleted_at >= cutoff_time
+    ).order_by(DeletedAttendance.deleted_at.desc()).all()
+    
+    result = []
+    for record in deleted_records:
+        result.append({
+            'id': record.id,
+            'guard_name': record.guard.name,
+            'location': record.guard.location.name,
+            'date': record.date.strftime('%Y-%m-%d'),
+            'shift': record.shift,
+            'status': record.status,
+            'deleted_by': record.deleted_by,
+            'deleted_at': record.deleted_at.strftime('%Y-%m-%d %H:%M:%S'),
+            'reason': record.deletion_reason
+        })
+    
+    return jsonify(result)
+
+
+# ============================================================================
+# MONTHLY NOMINAL ROLL REPORT (Add to reports.py or app.py)
+# ============================================================================
+
+@app.route('/generate-report/monthly-nominal-roll')
+def generate_monthly_nominal_roll():
+    """Generate monthly nominal roll report"""
+    if 'username' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+    
+    allowed_roles = ['Ops Manager', 'HR Officer', 'Finance', 'General Manager', 'Administrator', 'Business Support Officer']
+    if session.get('role') not in allowed_roles:
+        return jsonify({'error': 'Access denied'}), 403
+    
+    try:
+        # Get parameters
+        year = int(request.args.get('year', datetime.now().year))
+        month = int(request.args.get('month', datetime.now().month))
+        company_filter = request.args.get('company', '')
+        report_format = request.args.get('format', 'pdf')
+        
+        # Create date range for the month
+        start_date = date(year, month, 1)
+        if month == 12:
+            end_date = date(year + 1, 1, 1) - timedelta(days=1)
+        else:
+            end_date = date(year, month + 1, 1) - timedelta(days=1)
+        
+        # Query all guards with their attendance for the month
+        query = db.session.query(Guard, Location, Company).join(
+            Location, Guard.location_id == Location.id
+        ).join(
+            Company, Location.company_id == Company.id
+        )
+        
+        if company_filter:
+            query = query.filter(Company.name == company_filter)
+        
+        guards = query.order_by(Company.name, Location.name, Guard.name).all()
+        
+        # Build nominal roll data
+        nominal_roll = []
+        for guard, location, company in guards:
+            # Get attendance records for this guard in the month
+            attendance_records = Attendance.query.filter(
+                Attendance.guard_id == guard.id,
+                Attendance.date >= start_date,
+                Attendance.date <= end_date
+            ).all()
+            
+            # Count attendance
+            present_count = sum(1 for a in attendance_records if a.status == 'present')
+            absent_count = sum(1 for a in attendance_records if a.status == 'absent')
+            off_count = sum(1 for a in attendance_records if a.status == 'off')
+            leave_count = sum(1 for a in attendance_records if a.status == 'leave')
+            total_days = len(attendance_records)
+            
+            # Calculate attendance percentage
+            if total_days > 0:
+                attendance_percentage = (present_count / total_days) * 100
+            else:
+                attendance_percentage = 0
+            
+            nominal_roll.append({
+                'guard_name': guard.name,
+                'role': guard.role,
+                'location': location.name,
+                'company': company.name,
+                'shift': guard.shift_type,
+                'present': present_count,
+                'absent': absent_count,
+                'off': off_count,
+                'leave': leave_count,
+                'total_days': total_days,
+                'attendance_percentage': round(attendance_percentage, 2)
+            })
+        
+        # Generate report based on format
+        if report_format == 'csv':
+            return generate_nominal_roll_csv(nominal_roll, year, month, company_filter)
+        else:
+            return generate_nominal_roll_pdf(nominal_roll, year, month, company_filter)
+            
+    except Exception as e:
+        return jsonify({'error': f'Report generation failed: {str(e)}'}), 500
+
+
+def generate_nominal_roll_csv(data, year, month, company_filter):
+    """Generate CSV format for nominal roll"""
+    import io
+    import csv
+    from calendar import month_name
+    
+    output = io.StringIO()
+    writer = csv.writer(output)
+    
+    # Header
+    title = f"Monthly Nominal Roll - {month_name[month]} {year}"
+    if company_filter:
+        title += f" - {company_filter}"
+    
+    writer.writerow([title])
+    writer.writerow([])
+    writer.writerow(['Guard Name', 'Role', 'Location', 'Company', 'Shift', 
+                     'Present', 'Absent', 'Off', 'Leave', 'Total Days', 'Attendance %'])
+    
+    # Data rows
+    for record in data:
+        writer.writerow([
+            record['guard_name'],
+            record['role'].title(),
+            record['location'],
+            record['company'],
+            record['shift'].title(),
+            record['present'],
+            record['absent'],
+            record['off'],
+            record['leave'],
+            record['total_days'],
+            f"{record['attendance_percentage']}%"
+        ])
+    
+    # Summary
+    writer.writerow([])
+    writer.writerow(['Summary'])
+    writer.writerow(['Total Guards', len(data)])
+    writer.writerow(['Total Present Days', sum(r['present'] for r in data)])
+    writer.writerow(['Total Absent Days', sum(r['absent'] for r in data)])
+    
+    # Create response
+    output.seek(0)
+    response = make_response(output.getvalue())
+    response.headers['Content-Type'] = 'text/csv'
+    response.headers['Content-Disposition'] = f'attachment; filename=nominal_roll_{month}_{year}.csv'
+    
+    return response
+
+
+def generate_nominal_roll_pdf(data, year, month, company_filter):
+    """Generate PDF format for nominal roll"""
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import A4, landscape
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+    from reportlab.lib.styles import getSampleStyleSheet
+    from reportlab.lib.units import inch
+    from calendar import month_name
+    import io
+    
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=landscape(A4))
+    elements = []
+    styles = getSampleStyleSheet()
+    
+    # Title
+    title = f"Monthly Nominal Roll - {month_name[month]} {year}"
+    if company_filter:
+        title += f" - {company_filter}"
+    
+    elements.append(Paragraph(title, styles['Title']))
+    elements.append(Spacer(1, 0.3*inch))
+    
+    # Table data
+    table_data = [
+        ['Guard Name', 'Role', 'Location', 'Company', 'Shift', 
+         'Present', 'Absent', 'Off', 'Leave', 'Total', 'Attendance %']
+    ]
+    
+    for record in data:
+        table_data.append([
+            record['guard_name'],
+            record['role'].title(),
+            record['location'],
+            record['company'],
+            record['shift'].title(),
+            str(record['present']),
+            str(record['absent']),
+            str(record['off']),
+            str(record['leave']),
+            str(record['total_days']),
+            f"{record['attendance_percentage']}%"
+        ])
+    
+    # Create table
+    table = Table(table_data)
+    table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 10),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+        ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black),
+        ('FONTSIZE', (0, 1), (-1, -1), 8),
+    ]))
+    
+    elements.append(table)
+    elements.append(Spacer(1, 0.3*inch))
+    
+    # Summary
+    summary_data = [
+        ['Summary'],
+        ['Total Guards:', str(len(data))],
+        ['Total Present Days:', str(sum(r['present'] for r in data))],
+        ['Total Absent Days:', str(sum(r['absent'] for r in data))],
+    ]
+    
+    summary_table = Table(summary_data)
+    summary_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.lightblue),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black),
+    ]))
+    
+    elements.append(summary_table)
+    
+    # Build PDF
+    doc.build(elements)
+    buffer.seek(0)
+    
+    # Create response
+    response = make_response(buffer.getvalue())
+    response.headers['Content-Type'] = 'application/pdf'
+    response.headers['Content-Disposition'] = f'attachment; filename=nominal_roll_{month}_{year}.pdf'
+    
+    return response
+    
+# ============================================================================
 # APPLICATION STARTUP
 # ============================================================================
 
@@ -2094,10 +2240,10 @@ if __name__ == '__main__':
     print("🏢 Database created with sample data")
     print("👥 Users created for all roles")
     print("📍 Locations and guards populated")
-    print("🔐 Login with: supervisor/1234, ops/1234, hr/1234, etc.")
+    print("🔐 Login with: supervisor/sup2025, ops/ops2025, hr/hr2025, etc.")
 
     with app.app_context():
         db.create_all()
         print("Database tables created successfully.")
     
-    app.run(debug=True)
+    app.run(debug=True, port=5000)

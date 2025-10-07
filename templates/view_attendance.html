@@ -10,7 +10,20 @@
             <p class="text-gray-600">View and monitor guard attendance history</p>
         </div>
 
-        <!-- NEW: Company Quick Filters -->
+        <!-- Admin: Recently Deleted Records (Undo Section) -->
+        {% if session.get('role') == 'Administrator' %}
+        <div id="deleted-records-section" class="bg-yellow-50 border-2 border-yellow-400 rounded-2xl p-6 mb-6 hidden">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-bold text-yellow-800">🗑️ Recently Deleted Records (24hrs)</h3>
+                <button onclick="closeDeletedSection()" class="text-yellow-600 hover:text-yellow-800">✕</button>
+            </div>
+            <div id="deleted-records-list" class="space-y-2">
+                <!-- Populated by JavaScript -->
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Company Quick Filters -->
         <div class="flex flex-wrap gap-3 mb-6">
             <a href="{{ url_for('view_attendance') }}" 
                class="px-4 py-2 rounded-lg font-semibold transition {% if not filters.company %}bg-gray-800 text-white{% else %}bg-gray-200 text-gray-700 hover:bg-gray-300{% endif %}">
@@ -24,13 +37,12 @@
             {% endfor %}
         </div>
 
-        <!-- ENHANCED: Filters Section with new fields -->
+        <!-- Filters Section -->
         <div class="bg-white shadow-lg rounded-2xl p-6 mb-6">
             <h3 class="text-lg font-bold text-gray-800 mb-4">Filter Attendance Records</h3>
             
             <form method="GET" action="{{ url_for('view_attendance') }}">
                 <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                    <!-- Company Dropdown -->
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-2">Company</label>
                         <select name="company" class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-red-500">
@@ -43,7 +55,6 @@
                         </select>
                     </div>
 
-                    <!-- Location Search -->
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-2">Location</label>
                         <input type="text" name="location" value="{{ filters.location }}" 
@@ -51,21 +62,18 @@
                                class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-red-500">
                     </div>
 
-                    <!-- Date From -->
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-2">Date From</label>
                         <input type="date" name="date_from" value="{{ filters.date_from }}" 
                                class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-red-500">
                     </div>
 
-                    <!-- Date To -->
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-2">Date To</label>
                         <input type="date" name="date_to" value="{{ filters.date_to }}" 
                                class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-red-500">
                     </div>
 
-                    <!-- Shift Filter -->
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-2">Shift</label>
                         <select name="shift" class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-green-500">
@@ -75,7 +83,6 @@
                         </select>
                     </div>
 
-                    <!-- Status Filter -->
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-2">Status</label>
                         <select name="status" class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-yellow-500">
@@ -87,14 +94,12 @@
                         </select>
                     </div>
 
-                    <!-- Guard Search -->
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-2">Search Guard</label>
                         <input type="text" id="searchGuard" placeholder="Search guard name..." 
                                class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-purple-500">
                     </div>
 
-                    <!-- Action Buttons -->
                     <div class="flex items-end gap-2">
                         <button type="submit" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition font-medium">
                             🔍 Apply
@@ -106,7 +111,6 @@
                 </div>
             </form>
 
-            <!-- Results Summary -->
             {% if filters.company or filters.location or filters.date_from or filters.date_to or filters.shift or filters.status %}
             <div class="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
                 <p class="text-sm text-blue-800">
@@ -125,11 +129,15 @@
             </div>
             {% endif %}
 
-            <!-- Quick Export Button -->
-            <div class="mt-4">
+            <div class="mt-4 flex gap-2">
                 <button onclick="exportData()" class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition font-medium">
                     📊 Export Data
                 </button>
+                {% if session.get('role') == 'Administrator' %}
+                <button onclick="loadDeletedRecords()" class="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg transition font-medium">
+                    🗑️ View Deleted (Undo)
+                </button>
+                {% endif %}
             </div>
         </div>
 
@@ -160,7 +168,7 @@
             </div>
         </div>
 
-        <!-- Attendance Table (UNCHANGED) -->
+        <!-- Attendance Table -->
         <div class="bg-white shadow-lg rounded-2xl overflow-hidden">
             <div class="p-6">
                 <h3 class="text-xl font-bold text-gray-800 mb-4">📋 Attendance Records</h3>
@@ -179,11 +187,15 @@
                             <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">Marked By</th>
                             <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">Time</th>
                             <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">Notes</th>
+                            {% if session.get('role') == 'Administrator' %}
+                            <th class="px-6 py-3 text-center text-sm font-semibold text-gray-700">Actions</th>
+                            {% endif %}
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-200" id="attendanceTableBody">
                         {% for attendance, guard, location, company in attendance_records %}
                         <tr class="hover:bg-gray-50 transition attendance-row" 
+                            data-attendance-id="{{ attendance.id }}"
                             data-date="{{ attendance.date.strftime('%Y-%m-%d') }}"
                             data-shift="{{ attendance.shift }}"
                             data-status="{{ attendance.status }}"
@@ -251,6 +263,14 @@
                                     —
                                 {% endif %}
                             </td>
+                            {% if session.get('role') == 'Administrator' %}
+                            <td class="px-6 py-4 text-center">
+                                <button onclick="deleteAttendance({{ attendance.id }}, '{{ guard.name }}', '{{ attendance.date.strftime('%Y-%m-%d') }}')" 
+                                        class="text-red-600 hover:text-red-900 font-medium text-sm">
+                                    🗑️ Delete
+                                </button>
+                            </td>
+                            {% endif %}
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -268,15 +288,37 @@
     </div>
 </div>
 
+<!-- Delete Confirmation Modal -->
+<div id="delete-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+    <div class="bg-white rounded-xl shadow-2xl max-w-md w-full mx-4">
+        <div class="bg-red-600 text-white px-6 py-4 rounded-t-xl">
+            <h3 class="text-xl font-bold">⚠️ Delete Attendance Record</h3>
+        </div>
+        <div class="p-6">
+            <p class="text-gray-700 mb-4">Are you sure you want to delete this attendance record?</p>
+            <div class="bg-gray-100 p-4 rounded-lg mb-4">
+                <p class="text-sm"><strong>Guard:</strong> <span id="delete-guard-name"></span></p>
+                <p class="text-sm"><strong>Date:</strong> <span id="delete-date"></span></p>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Reason for deletion (optional):</label>
+                <textarea id="delete-reason" rows="3" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-red-500" placeholder="e.g., Duplicate entry, Wrong guard marked..."></textarea>
+            </div>
+        </div>
+        <div class="px-6 pb-6 flex justify-end space-x-3">
+            <button onclick="closeDeleteModal()" class="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">
+                Cancel
+            </button>
+            <button onclick="confirmDelete()" class="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">
+                Delete Record
+            </button>
+        </div>
+    </div>
+</div>
+
 <style>
-    .attendance-row.hidden {
-        display: none;
-    }
-    
-    .fade-in {
-        animation: fadeIn 0.3s ease-in;
-    }
-    
+    .attendance-row.hidden { display: none; }
+    .fade-in { animation: fadeIn 0.3s ease-in; }
     @keyframes fadeIn {
         from { opacity: 0; transform: translateY(10px); }
         to { opacity: 1; transform: translateY(0); }
@@ -285,6 +327,7 @@
 
 <script>
     let allRows = [];
+    let deleteAttendanceId = null;
     
     document.addEventListener('DOMContentLoaded', function() {
         allRows = Array.from(document.querySelectorAll('.attendance-row'));
@@ -306,7 +349,6 @@
     
     function updateStatistics() {
         const visibleRows = allRows.filter(row => !row.classList.contains('hidden'));
-        
         const stats = {
             total: visibleRows.length,
             present: visibleRows.filter(row => row.dataset.status === 'present').length,
@@ -324,7 +366,6 @@
     
     function exportData() {
         const visibleRows = allRows.filter(row => !row.classList.contains('hidden'));
-        
         if (visibleRows.length === 0) {
             alert('No data to export');
             return;
@@ -334,7 +375,7 @@
         let csvContent = headers.join(',') + '\n';
         
         visibleRows.forEach(row => {
-            const cells = Array.from(row.querySelectorAll('td')).map(cell => {
+            const cells = Array.from(row.querySelectorAll('td')).slice(0, 9).map(cell => {
                 let text = cell.textContent.trim().replace(/\s+/g, ' ').replace(/"/g, '""');
                 return text.includes(',') ? `"${text}"` : text;
             });
@@ -351,7 +392,136 @@
         document.body.removeChild(a);
         window.URL.revokeObjectURL(url);
         
-        alert('✅ Data exported successfully!');
+        showToast('Data exported successfully!', 'success');
+    }
+    
+    // Delete Functions
+    function deleteAttendance(attendanceId, guardName, date) {
+        deleteAttendanceId = attendanceId;
+        document.getElementById('delete-guard-name').textContent = guardName;
+        document.getElementById('delete-date').textContent = date;
+        document.getElementById('delete-reason').value = '';
+        document.getElementById('delete-modal').classList.remove('hidden');
+        document.getElementById('delete-modal').classList.add('flex');
+    }
+    
+    function closeDeleteModal() {
+        document.getElementById('delete-modal').classList.add('hidden');
+        deleteAttendanceId = null;
+    }
+    
+    async function confirmDelete() {
+        if (!deleteAttendanceId) return;
+        
+        const reason = document.getElementById('delete-reason').value;
+        
+        try {
+            const response = await fetch(`/api/admin/attendance/${deleteAttendanceId}`, {
+                method: 'DELETE',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ reason: reason })
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                showToast('Record deleted successfully! Click "View Deleted" to undo.', 'success');
+                
+                // Remove row from table
+                const row = document.querySelector(`[data-attendance-id="${deleteAttendanceId}"]`);
+                if (row) {
+                    row.remove();
+                    allRows = allRows.filter(r => r !== row);
+                    updateStatistics();
+                }
+                
+                closeDeleteModal();
+            } else {
+                showToast('Error: ' + result.error, 'error');
+            }
+        } catch (error) {
+            showToast('Error deleting record: ' + error.message, 'error');
+        }
+    }
+    
+    // Load Deleted Records
+    async function loadDeletedRecords() {
+        try {
+            const response = await fetch('/api/admin/attendance/deleted');
+            const deletedRecords = await response.json();
+            
+            if (deletedRecords.length === 0) {
+                showToast('No recently deleted records found', 'info');
+                return;
+            }
+            
+            const listHtml = deletedRecords.map(record => `
+                <div class="bg-white p-4 rounded-lg border border-yellow-300 flex justify-between items-center">
+                    <div class="flex-1">
+                        <p class="font-medium">${record.guard_name} - ${record.location}</p>
+                        <p class="text-sm text-gray-600">${record.date} | ${record.shift} shift | ${record.status}</p>
+                        <p class="text-xs text-gray-500 mt-1">Deleted by ${record.deleted_by} at ${record.deleted_at}</p>
+                        ${record.reason ? `<p class="text-xs text-gray-500 italic">Reason: ${record.reason}</p>` : ''}
+                    </div>
+                    <button onclick="undoDelete(${record.id})" class="ml-4 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium">
+                        ↩️ Undo
+                    </button>
+                </div>
+            `).join('');
+            
+            document.getElementById('deleted-records-list').innerHTML = listHtml;
+            document.getElementById('deleted-records-section').classList.remove('hidden');
+        } catch (error) {
+            showToast('Error loading deleted records: ' + error.message, 'error');
+        }
+    }
+    
+    async function undoDelete(deletedId) {
+        if (!confirm('Restore this attendance record?')) return;
+        
+        try {
+            const response = await fetch(`/api/admin/attendance/undo/${deletedId}`, {
+                method: 'POST'
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                showToast('Record restored successfully! Refresh page to see it.', 'success');
+                loadDeletedRecords(); // Refresh the deleted list
+                
+                // Optionally reload the page to show restored record
+                setTimeout(() => location.reload(), 2000);
+            } else {
+                showToast('Error: ' + result.error, 'error');
+            }
+        } catch (error) {
+            showToast('Error restoring record: ' + error.message, 'error');
+        }
+    }
+    
+    function closeDeletedSection() {
+        document.getElementById('deleted-records-section').classList.add('hidden');
+    }
+    
+    function showToast(message, type) {
+        const toast = document.createElement('div');
+        toast.className = `fixed top-4 right-4 px-6 py-3 rounded-lg shadow-lg text-white font-medium fade-in z-50 ${
+            type === 'success' ? 'bg-green-600' : 
+            type === 'error' ? 'bg-red-600' : 
+            'bg-blue-600'
+        }`;
+        
+        const icon = type === 'success' ? '✅' : type === 'error' ? '❌' : 'ℹ️';
+        toast.innerHTML = `${icon} ${message}`;
+        
+        document.body.appendChild(toast);
+        
+        setTimeout(() => {
+            toast.style.opacity = '0';
+            toast.style.transform = 'translateX(100%)';
+            setTimeout(() => document.body.removeChild(toast), 300);
+        }, 4000);
     }
 </script>
 {% endblock %}
