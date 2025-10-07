@@ -2201,6 +2201,11 @@ def generate_nominal_roll_pdf(data, year, month, company_filter):
 def create_db_tables():
     """Initializes all database tables and seeds initial users if the database is empty."""
     with app.app_context():
+        # ⚠️ TEMPORARY LINE: DROP ALL TABLES BEFORE CREATION
+        # THIS IS ONLY FOR CLEANUP! REMOVE AFTER THE NEXT SUCCESSFUL DEPLOYMENT!
+        db.drop_all()
+        print("⚠️ Dropped all tables in the database to fix corrupted data.")
+        
         # 1. Create all tables
         db.create_all()
         print("Database tables created successfully.")
